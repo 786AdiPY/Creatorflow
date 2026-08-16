@@ -4,7 +4,10 @@
 import { API_URL } from './config';
 
 async function call<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${API_URL}/${path}`, {
+  const base = API_URL.replace(/\/+$/, '');
+  const sub = path.replace(/^\/+/, '');
+  const url = base ? `${base}/${sub}` : `/${sub}`;
+  const res = await fetch(url, {
     ...options,
     headers: { 'Content-Type': 'application/json', ...(options.headers ?? {}) },
   });

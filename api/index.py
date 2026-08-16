@@ -1,5 +1,11 @@
 """CreatorFlow backend — FastAPI on Vercel.
 
+Deployed as one of two runtimes in a single Vercel project (see the root
+vercel.json): this Python function owns everything under /api/*, a static
+build of ../frontend owns everything else. Routes here are prefixed with
+/api accordingly — Vercel forwards the request path as-is, it doesn't strip
+the matched prefix.
+
 No job queue: Vercel's Python functions don't support background work after
 the response the way Deno's EdgeRuntime.waitUntil did, so every endpoint here
 does its work synchronously and returns the finished row. That's a genuine
@@ -16,14 +22,18 @@ import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from supabase import create_client, Client
+def get_db() -> Client:
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    if not url or not key:
+        raise HTTPException(
+            500,
+            "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in environment variables."
+        )
+    return create_client(url, key)
 
-SUPABASE_URL = os.environ["SUPABASE_URL"]
-SUPABASE_SERVICE_ROLE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
 OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL") or "openai/gpt-4o-mini"
-
-db: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
 app = FastAPI(title="CreatorFlow API")
 app.add_middleware(
@@ -43,7 +53,8 @@ PLATFORM_LIMITS = {
 
 
 @app.get("/")
-@app.get("/health")
+@app.get("/api")
+@app.get("/api/health")
 def health():
     return {"status": "ok"}
 
@@ -54,7 +65,7 @@ class MetadataGenerateRequest(BaseModel):
     platform: Platform
 
 
-@app.post("/metadata/generate")
+@app.post("/api/metadata/generate")
 def generate_metadata(body: MetadataGenerateRequest):
     if not OPENROUTER_API_KEY:
         raise HTTPException(500, "Missing OPENROUTER_API_KEY")
@@ -62,7 +73,7 @@ def generate_metadata(body: MetadataGenerateRequest):
     limits = PLATFORM_LIMITS[body.platform]
 
     asset = (
-        db.table("content_assets")
+        get_db().table("content_assets")
         .select("storage_url, source_type")
         .eq("id", body.content_asset_id)
         .single()
@@ -115,7 +126,7 @@ def generate_metadata(body: MetadataGenerateRequest):
         "tags": (parsed.get("tags") or [])[: limits["tags"]],
         "generated_by": "ai",
     }
-    row = db.table("metadata_drafts").insert(draft).execute().data[0]
+    row = get_db().table("metadata_drafts").insert(draft).execute().data[0]
     return row
 
 
@@ -125,7 +136,7 @@ class ThumbnailGenerateRequest(BaseModel):
     style_prompt: str | None = None
 
 
-@app.post("/thumbnails/generate")
+@app.post("/api/thumbnails/generate")
 def generate_thumbnails(body: ThumbnailGenerateRequest):
     # TODO: call an image-gen API and upload results to Storage. Placeholder
     # variants so the pipeline is exercisable end-to-end without a provider.
@@ -138,7 +149,7 @@ def generate_thumbnails(body: ThumbnailGenerateRequest):
         }
         for n in (1, 2)
     ]
-    rows = db.table("thumbnails").insert(variants).execute().data
+    rows = get_db().table("thumbnails").insert(variants).execute().data
     return rows
 
 
@@ -147,7 +158,7 @@ class ClipGenerateRequest(BaseModel):
     content_asset_id: str
 
 
-@app.post("/clips/generate")
+@app.post("/api/clips/generate")
 def generate_clips(body: ClipGenerateRequest):
     # TODO: run ffmpeg scene detection / highlight scoring over the source asset.
     candidate = {
@@ -158,7 +169,7 @@ def generate_clips(body: ClipGenerateRequest):
         "score": 0.5,
         "status": "done",
     }
-    row = db.table("clips").insert(candidate).execute().data[0]
+    row = get_db().table("clips").insert(candidate).execute().data[0]
     return row
 
 
@@ -172,10 +183,10 @@ def mock_publish(platform: str) -> str:
     return f"mock_{platform}_{uuid.uuid4()}"
 
 
-@app.post("/publish")
+@app.post("/api/publish")
 def publish_now(body: PublishRequest):
     post = (
-        db.table("scheduled_posts")
+        get_db().table("scheduled_posts")
         .select("*, connected_accounts(platform)")
         .eq("id", body.scheduled_post_id)
         .single()
@@ -185,7 +196,7 @@ def publish_now(body: PublishRequest):
     try:
         platform_post_id = mock_publish(post["connected_accounts"]["platform"])
         updated = (
-            db.table("scheduled_posts")
+            get_db().table("scheduled_posts")
             .update({"status": "posted", "platform_post_id": platform_post_id})
             .eq("id", body.scheduled_post_id)
             .execute()
@@ -194,7 +205,7 @@ def publish_now(body: PublishRequest):
         return updated
     except Exception as err:  # noqa: BLE001 — surfaced to the caller, not swallowed
         updated = (
-            db.table("scheduled_posts")
+            get_db().table("scheduled_posts")
             .update({"status": "failed", "platform_payload": {"error": str(err)}})
             .eq("id", body.scheduled_post_id)
             .execute()

@@ -51,11 +51,20 @@ npm install
 npm run dev             # http://localhost:5174
 ```
 
-Deploying to Vercel: two separate Vercel projects, one per directory (set
-each project's Root Directory to `frontend` or `backend`). Both ship a
-`vercel.json` — the frontend's rewrites every path to `index.html` (required
-for a client-routed SPA, otherwise deep links like `/library` 404), the
-backend's rewrites every path into the single FastAPI ASGI function.
+Deploying to Vercel (Single Project):
+
+1. Import this repository into Vercel.
+2. Under **Project Settings** -> **General**:
+   - Set **Root Directory** to `./` (leave blank or select repository root).
+   - **Framework Preset**: `Other` or `Vite`.
+3. Set Environment Variables in Vercel Dashboard:
+   - `SUPABASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `OPENROUTER_API_KEY` (optional)
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+   - `VITE_API_URL` (optional, defaults to `/api` for same-origin)
+4. Deploy! `vercel.json` automatically builds the React frontend into `frontend/dist` and routes `/api/*` requests to the Python serverless function at `api/index.py`.
 
 ### AI features (OpenRouter)
 
