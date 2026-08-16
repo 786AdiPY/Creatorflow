@@ -1,7 +1,6 @@
 # CreatorFlow
 
-Social media automation suite MVP — thumbnails, metadata/SEO, upload scheduling,
-analytics, comment moderation, and clip generation in one dashboard.
+CreatorFlow is an AI-powered workspace that turns a creator's raw content into publish-ready social media content, handles publishing, and brings the resulting performance data back into one dashboard.
 
 ## Workflow
 
