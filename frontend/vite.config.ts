@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  envPrefix: ['VITE_', 'SUPABASE_'],
   server: {
     // 5173 is the console's (frontend/) default — keep the two apps running
     // side by side in local dev without a port clash.
