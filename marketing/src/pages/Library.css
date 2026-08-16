@@ -17,17 +17,16 @@
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
 }
-.lib-back {
+.lib-brand {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
+  gap: 8px;
+  padding: 6px 8px 6px 6px;
   border-radius: var(--radius);
-  color: var(--color-text-2);
+  color: inherit;
   flex-shrink: 0;
 }
-.lib-back:hover {
+.lib-brand:hover {
   background: var(--color-surface-3);
 }
 .lib-top h1 {

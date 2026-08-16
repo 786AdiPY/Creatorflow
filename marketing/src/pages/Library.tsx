@@ -4,7 +4,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ArrowLeft,
   BarChart3,
   CalendarClock,
   Image,
@@ -56,10 +55,13 @@ export default function Library() {
   return (
     <div className="lib">
       <header className="lib-top">
-        <Link to="/" className="lib-back" aria-label="Back to CreatorFlow">
-          <ArrowLeft size={16} />
+        <Link to="/" className="lib-brand" aria-label="Back to CreatorFlow">
+          <svg viewBox="0 0 32 32" className="lp-mark" aria-hidden="true">
+            <rect width="32" height="32" rx="8" fill="currentColor" opacity="0.06" />
+            <path d="M11 9v14l12-7-12-7Z" fill="currentColor" className="lp-mark__play" />
+          </svg>
+          <h1>CreatorFlow</h1>
         </Link>
-        <h1>CreatorFlow</h1>
         <div className="lib-top__right">
           <AssetPicker value={contentAssetId} onChange={setContentAssetId} refreshKey={refreshKey} />
           <label className="lib-btn">

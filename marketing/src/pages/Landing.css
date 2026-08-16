@@ -97,14 +97,6 @@
   font-size: 1.05rem;
   color: var(--color-brand);
 }
-.lp-mark {
-  width: 26px;
-  height: 26px;
-  color: var(--color-brand);
-}
-.lp-mark__play {
-  fill: var(--color-primary);
-}
 .lp-nav__links {
   display: flex;
   gap: 28px;
