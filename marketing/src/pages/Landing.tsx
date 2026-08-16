@@ -27,7 +27,6 @@ import {
 import PipelinePreview from '../components/PipelinePreview';
 import { KIND_LABEL } from '../flow/types';
 import type { NodeKind } from '../flow/types';
-import { CONSOLE_URL } from '../lib/config';
 import './Landing.css';
 
 const CHAPTERS = [
@@ -666,14 +665,6 @@ function Cta() {
             Open the Studio
             <Arrow />
           </Link>
-          <a
-            className="lp-btn lp-btn--ghost lp-btn--lg"
-            href={CONSOLE_URL}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Open the console
-          </a>
         </Reveal>
       </div>
     </section>
@@ -691,9 +682,6 @@ function Footer() {
         </a>
         <nav aria-label="Footer">
           <Link to="/studio">Studio</Link>
-          <a href={CONSOLE_URL} target="_blank" rel="noreferrer">
-            Console
-          </a>
           <a href="#pipeline">Pipeline</a>
           <a
             href="https://github.com/786AdiPY/Creatorflow/blob/main/social-media-automation-mvp-docs-supabase.md"

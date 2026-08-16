@@ -1,9 +1,7 @@
-// Studio — the n8n-style workflow builder. Drag modules from the palette,
-// wire them together, configure each one, and (locally) simulate a run.
-//
-// Scope note: this is the visual builder surface. Wiring "Run" to a real
-// execution — actually kicking off the jobs the console/backend already
-// exposes — is the next integration step, not something this page fakes.
+// Studio — the n8n-style workflow builder, now wired to the real backend.
+// Drag modules from the palette, wire them together, configure each one, and
+// hit Run: it walks the graph left-to-right and calls the actual Supabase
+// Edge Functions / tables behind each module, polling jobs to completion.
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -18,7 +16,6 @@ import {
   useEdgesState,
   useReactFlow,
   type Connection,
-  type Node,
   type OnConnect,
   type NodeMouseHandler,
 } from '@xyflow/react';
@@ -27,7 +24,6 @@ import {
   BarChart3,
   CalendarClock,
   Check,
-  ExternalLink,
   Image,
   MessageSquare,
   Play,
@@ -45,7 +41,9 @@ import { nodeTypes } from '../flow/FlowNode';
 import { initialEdges, initialNodes } from '../flow/initialFlow';
 import type { FlowNode, FlowNodeData, NodeKind } from '../flow/types';
 import { KIND_LABEL } from '../flow/types';
-import { CONSOLE_URL } from '../lib/config';
+import { supabase } from '../lib/supabase';
+import { api } from '../lib/api';
+import { uploadContentAsset } from '../lib/assets';
 import '../flow/flow.css';
 import './Studio.css';
 
@@ -90,6 +88,11 @@ function StudioShell() {
   const [running, setRunning] = useState(false);
   const [runLog, setRunLog] = useState<string[]>([]);
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
+  const [contentAssetId, setContentAssetId] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [awaitingApproval, setAwaitingApproval] = useState(false);
+  const approveResolver = useRef<(() => void) | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const { screenToFlowPosition } = useReactFlow();
@@ -211,27 +214,182 @@ function StudioShell() {
     setSaved(true);
   };
 
-  const handleRun = () => {
+  const handleUploadClick = () => fileInputRef.current?.click();
+
+  const handleFileSelected = async (file: File) => {
+    setUploading(true);
+    try {
+      const asset = await uploadContentAsset(file);
+      setContentAssetId(asset.id);
+      setRunLog((log) => [...log, `content_asset created · ${asset.id}`]);
+    } catch (err) {
+      setRunLog((log) => [...log, `upload failed — ${(err as Error).message}`]);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const appendLog = (line: string) => setRunLog((log) => [...log, line]);
+
+  const findOrCreateAccount = async (platform: string) => {
+    const normalized = platform.toLowerCase();
+    const { data: existing } = await supabase
+      .from('connected_accounts')
+      .select('id')
+      .eq('platform', normalized)
+      .eq('platform_account_id', 'studio-demo')
+      .maybeSingle();
+    if (existing) return existing.id as string;
+    const { data, error } = await supabase
+      .from('connected_accounts')
+      .insert({ platform: normalized, platform_account_id: 'studio-demo' })
+      .select('id')
+      .single();
+    if (error) throw error;
+    return data.id as string;
+  };
+
+  const handleRun = async () => {
     if (running) return;
+    if (!contentAssetId) {
+      appendLog('Run blocked — upload an asset first.');
+      return;
+    }
     setRunning(true);
     setRunLog([]);
+
+    let metadataDraftId: string | null = null;
+    let thumbnailId: string | null = null;
+    let scheduledPostId: string | null = null;
+
     const ordered = [...nodes].sort((a, b) => a.position.x - b.position.x);
-    ordered.forEach((node, i) => {
-      window.setTimeout(() => {
-        setActiveNodeId(node.id);
-        setRunLog((log) => [...log, logLineFor(node)]);
-        if (i === ordered.length - 1) {
-          window.setTimeout(() => {
-            setActiveNodeId(null);
-            setRunning(false);
-          }, 500);
+
+    for (const node of ordered) {
+      setActiveNodeId(node.id);
+      try {
+        switch (node.data.label) {
+          case 'New Upload':
+            appendLog(`New Upload — content_asset ${contentAssetId} ready`);
+            break;
+
+          case 'Clip Finder': {
+            const clip = await api.clips.generate(contentAssetId);
+            appendLog(`Clip Finder — candidate ready (${(clip.start_ms / 1000).toFixed(1)}s–${(clip.end_ms / 1000).toFixed(1)}s)`);
+            break;
+          }
+
+          case 'Thumbnail AI': {
+            const variants = await api.thumbnails.generate(contentAssetId);
+            thumbnailId = variants[0]?.id ?? null;
+            appendLog(`Thumbnail AI — ${variants.length} variant(s) generated`);
+            break;
+          }
+
+          case 'Metadata AI': {
+            const draft = await api.metadata.generate(contentAssetId, 'youtube');
+            metadataDraftId = draft.id;
+            appendLog(`Metadata AI — draft generated: "${draft.title || draft.description.slice(0, 40)}"`);
+            break;
+          }
+
+          case 'Schedule': {
+            if (!metadataDraftId) {
+              appendLog('Schedule — skipped, no metadata draft to attach');
+              break;
+            }
+            const publishNode = nodes.find((n) => n.data.label === 'Publish');
+            const platform = publishNode?.data.platforms?.[0] ?? 'YouTube';
+            const connectedAccountId = await findOrCreateAccount(platform);
+            const { data, error } = await supabase
+              .from('scheduled_posts')
+              .insert({
+                content_asset_id: contentAssetId,
+                connected_account_id: connectedAccountId,
+                metadata_draft_id: metadataDraftId,
+                thumbnail_id: thumbnailId,
+                scheduled_time: new Date().toISOString(),
+              })
+              .select('id')
+              .single();
+            if (error) throw error;
+            scheduledPostId = data.id;
+            appendLog(`Schedule — queued for ${platform}`);
+            break;
+          }
+
+          case 'Approval': {
+            appendLog('Approval — waiting on sign-off…');
+            setAwaitingApproval(true);
+            await new Promise<void>((resolve) => {
+              approveResolver.current = resolve;
+            });
+            setAwaitingApproval(false);
+            appendLog('Approval — approved');
+            break;
+          }
+
+          case 'Publish': {
+            if (!scheduledPostId) {
+              appendLog('Publish — skipped, nothing scheduled');
+              break;
+            }
+            const result = await api.publish.now(scheduledPostId);
+            appendLog(result.status === 'posted' ? 'Publish — posted' : `Publish — ${result.status}`);
+            break;
+          }
+
+          case 'Analytics': {
+            if (!scheduledPostId) {
+              appendLog('Analytics — nothing published yet');
+              break;
+            }
+            const { data } = await supabase
+              .from('analytics_snapshots')
+              .select('id')
+              .eq('scheduled_post_id', scheduledPostId);
+            appendLog(`Analytics — ${data?.length ?? 0} snapshot(s) on record`);
+            break;
+          }
+
+          case 'Moderation': {
+            if (!scheduledPostId) {
+              appendLog('Moderation — nothing published yet');
+              break;
+            }
+            const { data } = await supabase
+              .from('comments')
+              .select('id')
+              .eq('scheduled_post_id', scheduledPostId)
+              .is('moderation_action', null);
+            appendLog(`Moderation — ${data?.length ?? 0} comment(s) pending review`);
+            break;
+          }
+
+          default:
+            appendLog(`${node.data.label} — no runner wired for this module yet`);
         }
-      }, i * 550);
-    });
+      } catch (err) {
+        appendLog(`${node.data.label} — error: ${(err as Error).message}`);
+      }
+    }
+
+    setActiveNodeId(null);
+    setRunning(false);
   };
 
   return (
     <div className="st">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="video/*,image/*"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleFileSelected(file);
+          e.target.value = '';
+        }}
+      />
       <TopBar
         name={name}
         onNameChange={(v) => {
@@ -242,6 +400,9 @@ function StudioShell() {
         running={running}
         onSave={handleSave}
         onRun={handleRun}
+        onUpload={handleUploadClick}
+        uploading={uploading}
+        contentAssetId={contentAssetId}
       />
 
       <div className="st-body">
@@ -272,7 +433,18 @@ function StudioShell() {
             <MiniMap pannable zoomable nodeColor="var(--color-border-strong)" />
           </ReactFlow>
 
-          {runLog.length > 0 && <RunLog lines={runLog} running={running} onClear={() => setRunLog([])} />}
+          {runLog.length > 0 && (
+            <RunLog
+              lines={runLog}
+              running={running}
+              awaitingApproval={awaitingApproval}
+              onApprove={() => {
+                approveResolver.current?.();
+                approveResolver.current = null;
+              }}
+              onClear={() => setRunLog([])}
+            />
+          )}
         </div>
 
         {selectedNode && (
@@ -288,22 +460,6 @@ function StudioShell() {
   );
 }
 
-function logLineFor(node: Node<FlowNodeData>): string {
-  const { label, kind } = node.data;
-  switch (kind) {
-    case 'trigger':
-      return `${label} — asset received, run started`;
-    case 'generate':
-      return `${label} — generated output for review`;
-    case 'gate':
-      return `${label} — waiting on sign-off`;
-    case 'action':
-      return `${label} — step executed`;
-    default:
-      return `${label} — updated`;
-  }
-}
-
 function TopBar({
   name,
   onNameChange,
@@ -311,6 +467,9 @@ function TopBar({
   running,
   onSave,
   onRun,
+  onUpload,
+  uploading,
+  contentAssetId,
 }: {
   name: string;
   onNameChange: (v: string) => void;
@@ -318,6 +477,9 @@ function TopBar({
   running: boolean;
   onSave: () => void;
   onRun: () => void;
+  onUpload: () => void;
+  uploading: boolean;
+  contentAssetId: string | null;
 }) {
   return (
     <header className="st-top">
@@ -336,13 +498,13 @@ function TopBar({
         </span>
       </div>
       <div className="st-top__right">
-        <a className="st-btn st-btn--ghost" href={CONSOLE_URL} target="_blank" rel="noreferrer">
-          Console <ExternalLink size={13} />
-        </a>
+        <button className="st-btn st-btn--ghost" onClick={onUpload} disabled={uploading}>
+          <Upload size={14} /> {uploading ? 'Uploading…' : contentAssetId ? 'Asset ready' : 'Upload asset'}
+        </button>
         <button className="st-btn st-btn--ghost" onClick={onSave}>
           <Save size={14} /> Save
         </button>
-        <button className="st-btn st-btn--solid" onClick={onRun} disabled={running}>
+        <button className="st-btn st-btn--solid" onClick={onRun} disabled={running || !contentAssetId}>
           <Play size={14} /> {running ? 'Running…' : 'Run'}
         </button>
       </div>
@@ -511,7 +673,19 @@ function ConfigPanel({
   );
 }
 
-function RunLog({ lines, running, onClear }: { lines: string[]; running: boolean; onClear: () => void }) {
+function RunLog({
+  lines,
+  running,
+  awaitingApproval,
+  onApprove,
+  onClear,
+}: {
+  lines: string[];
+  running: boolean;
+  awaitingApproval: boolean;
+  onApprove: () => void;
+  onClear: () => void;
+}) {
   return (
     <div className="st-log">
       <div className="st-log__head">
@@ -529,7 +703,12 @@ function RunLog({ lines, running, onClear }: { lines: string[]; running: boolean
             {l}
           </div>
         ))}
-        {running && <span className="st-log__caret" />}
+        {running && !awaitingApproval && <span className="st-log__caret" />}
+        {awaitingApproval && (
+          <button className="st-btn st-btn--solid" style={{ marginTop: 8 }} onClick={onApprove}>
+            <Check size={13} /> Approve to continue
+          </button>
+        )}
       </div>
     </div>
   );

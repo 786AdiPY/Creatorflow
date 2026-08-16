@@ -1,11 +1,16 @@
 -- CreatorFlow MVP schema — platform-agnostic core with JSONB escape hatches.
 -- See docs: social-media-automation-mvp-docs-supabase.md §4
+--
+-- No auth/multi-tenancy in this pass (single-workspace MVP) — user_id columns
+-- are kept for a future multi-user cut but are nullable with no FK/RLS, so the
+-- anon key can read/write freely. Re-add `references auth.users` + RLS
+-- policies scoped to auth.uid() when real accounts land.
 
 create extension if not exists "pgcrypto";
 
 create table connected_accounts (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete cascade,
+  user_id uuid,
   platform text not null check (platform in ('youtube', 'instagram', 'tiktok')),
   platform_account_id text not null,
   oauth_tokens jsonb not null default '{}',
@@ -14,7 +19,7 @@ create table connected_accounts (
 
 create table content_assets (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete cascade,
+  user_id uuid,
   source_type text not null check (source_type in ('upload', 'generated')),
   storage_url text not null,
   duration_seconds int,
@@ -88,10 +93,10 @@ create table clips (
 
 -- Generic jobs table backs every async operation across all six modules
 -- (thumbnail render, metadata gen, clip analysis, publish, analytics fetch)
--- so the frontend has one polling/status pattern instead of six.
+-- so the console has one polling/status pattern instead of six.
 create table jobs (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete cascade,
+  user_id uuid,
   job_type text not null,
   status text not null default 'pending' check (status in ('pending', 'processing', 'done', 'failed')),
   progress numeric not null default 0,
@@ -111,57 +116,3 @@ create index on analytics_snapshots (scheduled_post_id);
 create index on comments (scheduled_post_id);
 create index on clips (content_asset_id);
 create index on jobs (user_id);
-
--- Row Level Security: every table scoped to its owning user.
-alter table connected_accounts enable row level security;
-alter table content_assets enable row level security;
-alter table thumbnails enable row level security;
-alter table metadata_drafts enable row level security;
-alter table scheduled_posts enable row level security;
-alter table analytics_snapshots enable row level security;
-alter table comments enable row level security;
-alter table clips enable row level security;
-alter table jobs enable row level security;
-
-create policy "own connected_accounts" on connected_accounts
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-
-create policy "own content_assets" on content_assets
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-
-create policy "own thumbnails" on thumbnails
-  for all using (exists (
-    select 1 from content_assets a where a.id = thumbnails.content_asset_id and a.user_id = auth.uid()
-  ));
-
-create policy "own metadata_drafts" on metadata_drafts
-  for all using (exists (
-    select 1 from content_assets a where a.id = metadata_drafts.content_asset_id and a.user_id = auth.uid()
-  ));
-
-create policy "own scheduled_posts" on scheduled_posts
-  for all using (exists (
-    select 1 from content_assets a where a.id = scheduled_posts.content_asset_id and a.user_id = auth.uid()
-  ));
-
-create policy "own analytics_snapshots" on analytics_snapshots
-  for all using (exists (
-    select 1 from scheduled_posts p
-    join content_assets a on a.id = p.content_asset_id
-    where p.id = analytics_snapshots.scheduled_post_id and a.user_id = auth.uid()
-  ));
-
-create policy "own comments" on comments
-  for all using (exists (
-    select 1 from scheduled_posts p
-    join content_assets a on a.id = p.content_asset_id
-    where p.id = comments.scheduled_post_id and a.user_id = auth.uid()
-  ));
-
-create policy "own clips" on clips
-  for all using (exists (
-    select 1 from content_assets a where a.id = clips.content_asset_id and a.user_id = auth.uid()
-  ));
-
-create policy "own jobs" on jobs
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
