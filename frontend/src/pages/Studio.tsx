@@ -126,7 +126,7 @@ function StudioShell({ contentAssetId }: { contentAssetId: string | null }) {
   const onPaneClick = useCallback(() => setSelectedId(null), []);
 
   const onDragStart = (e: DragEvent, template: (typeof PALETTE)[number]) => {
-    e.dataTransfer.setData('application/creatorflow-node', JSON.stringify(template));
+    e.dataTransfer.setData('application/creatorflow-node-label', template.label);
     e.dataTransfer.effectAllowed = 'move';
   };
 
@@ -138,9 +138,22 @@ function StudioShell({ contentAssetId }: { contentAssetId: string | null }) {
   const onDrop = useCallback(
     (e: DragEvent) => {
       e.preventDefault();
-      const raw = e.dataTransfer.getData('application/creatorflow-node');
-      if (!raw || !wrapperRef.current) return;
-      const template = JSON.parse(raw) as (typeof PALETTE)[number];
+      const rawLabel =
+        e.dataTransfer.getData('application/creatorflow-node-label') ||
+        e.dataTransfer.getData('application/creatorflow-node');
+      if (!rawLabel || !wrapperRef.current) return;
+
+      let template = PALETTE.find((p) => p.label === rawLabel);
+      if (!template) {
+        try {
+          const parsed = JSON.parse(rawLabel);
+          template = PALETTE.find((p) => p.label === parsed.label);
+        } catch {
+          // ignore
+        }
+      }
+      if (!template) return;
+
       const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
       const id = nextId();
       const newNode: FlowNode = {

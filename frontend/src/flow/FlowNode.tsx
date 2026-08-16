@@ -14,7 +14,7 @@ const KIND_CLASS: Record<NodeKind, string> = {
 };
 
 function FlowNodeImpl({ data, selected }: NodeProps<FlowNode>) {
-  const Icon = data.icon;
+  const Icon = data.icon || CircleDot;
   const showTarget = data.kind !== 'trigger';
   const showSource = data.kind !== 'output';
 
