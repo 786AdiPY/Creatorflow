@@ -92,7 +92,7 @@ function Nav() {
         <a href="#studio">Builder</a>
         <a href="#platform">Platform</a>
       </nav>
-      <Link to="/studio" className="lp-nav__cta">
+      <Link to="/library" className="lp-nav__cta">
         Open the Studio
         <Arrow />
       </Link>
@@ -176,7 +176,7 @@ function Hero() {
         </Reveal>
 
         <Reveal className="lp-hero__actions" delay={5}>
-          <Link ref={cta} to="/studio" className="lp-btn lp-btn--solid">
+          <Link ref={cta} to="/library" className="lp-btn lp-btn--solid">
             Open the Studio
             <Arrow />
           </Link>
@@ -498,7 +498,7 @@ function Studio() {
               <i />
             </span>
             <span className="lp-mono">studio · draft</span>
-            <Link to="/studio" className="lp-canvas__open">
+            <Link to="/library" className="lp-canvas__open">
               Open full Studio <Arrow />
             </Link>
           </div>
@@ -661,7 +661,7 @@ function Cta() {
           <RevealWords as="span" className="lp-display__line" text="Stop tab-switching." />
         </h2>
         <Reveal className="lp-cta__actions" delay={2}>
-          <Link ref={ref} to="/studio" className="lp-btn lp-btn--solid lp-btn--lg">
+          <Link ref={ref} to="/library" className="lp-btn lp-btn--solid lp-btn--lg">
             Open the Studio
             <Arrow />
           </Link>
@@ -681,7 +681,7 @@ function Footer() {
           <span>CreatorFlow</span>
         </a>
         <nav aria-label="Footer">
-          <Link to="/studio">Studio</Link>
+          <Link to="/library">Studio</Link>
           <a href="#pipeline">Pipeline</a>
           <a
             href="https://github.com/786AdiPY/Creatorflow/blob/main/social-media-automation-mvp-docs-supabase.md"

@@ -7,6 +7,10 @@
   font-family: var(--font-sans);
   overflow: hidden;
 }
+/* Embedded as a Library tab: fill the tab's flush panel instead of the viewport. */
+.st--embedded {
+  height: 100%;
+}
 
 /* ── top bar ──────────────────────────────────────────────────────── */
 .st-top {

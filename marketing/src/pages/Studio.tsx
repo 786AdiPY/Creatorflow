@@ -1,9 +1,10 @@
-// Studio — the n8n-style workflow builder, now wired to the real backend.
-// Drag modules from the palette, wire them together, configure each one, and
-// hit Run: it walks the graph left-to-right and calls the actual Supabase
-// Edge Functions / tables behind each module, polling jobs to completion.
+// Studio — the n8n-style workflow builder, embedded as a tab inside Library
+// (see pages/Library.tsx) rather than its own page. Drag modules from the
+// palette, wire them together, configure each one, and hit Run: it walks the
+// graph left-to-right and calls the real backend behind each module.
+// The content asset it runs against is selected/uploaded from Library's
+// shared top bar, not owned here.
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
-import { Link } from 'react-router-dom';
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -20,7 +21,6 @@ import {
   type NodeMouseHandler,
 } from '@xyflow/react';
 import {
-  ArrowLeft,
   BarChart3,
   CalendarClock,
   Check,
@@ -43,7 +43,6 @@ import type { FlowNode, FlowNodeData, NodeKind } from '../flow/types';
 import { KIND_LABEL } from '../flow/types';
 import { supabase } from '../lib/supabase';
 import { api } from '../lib/api';
-import { uploadContentAsset } from '../lib/assets';
 import '../flow/flow.css';
 import './Studio.css';
 
@@ -64,15 +63,15 @@ const PALETTE: Array<{ kind: NodeKind; label: string; subtitle: string; icon: Fl
 
 const PLATFORM_OPTIONS = ['YouTube', 'Instagram', 'TikTok', 'X', 'LinkedIn', 'Threads'];
 
-export default function Studio() {
+export default function Studio({ contentAssetId }: { contentAssetId: string | null }) {
   return (
     <ReactFlowProvider>
-      <StudioShell />
+      <StudioShell contentAssetId={contentAssetId} />
     </ReactFlowProvider>
   );
 }
 
-function StudioShell() {
+function StudioShell({ contentAssetId }: { contentAssetId: string | null }) {
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -88,11 +87,8 @@ function StudioShell() {
   const [running, setRunning] = useState(false);
   const [runLog, setRunLog] = useState<string[]>([]);
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
-  const [contentAssetId, setContentAssetId] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
   const [awaitingApproval, setAwaitingApproval] = useState(false);
   const approveResolver = useRef<(() => void) | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const { screenToFlowPosition } = useReactFlow();
@@ -214,21 +210,6 @@ function StudioShell() {
     setSaved(true);
   };
 
-  const handleUploadClick = () => fileInputRef.current?.click();
-
-  const handleFileSelected = async (file: File) => {
-    setUploading(true);
-    try {
-      const asset = await uploadContentAsset(file);
-      setContentAssetId(asset.id);
-      setRunLog((log) => [...log, `content_asset created · ${asset.id}`]);
-    } catch (err) {
-      setRunLog((log) => [...log, `upload failed — ${(err as Error).message}`]);
-    } finally {
-      setUploading(false);
-    }
-  };
-
   const appendLog = (line: string) => setRunLog((log) => [...log, line]);
 
   const findOrCreateAccount = async (platform: string) => {
@@ -252,7 +233,7 @@ function StudioShell() {
   const handleRun = async () => {
     if (running) return;
     if (!contentAssetId) {
-      appendLog('Run blocked — upload an asset first.');
+      appendLog('Run blocked — select or upload an asset above first.');
       return;
     }
     setRunning(true);
@@ -378,18 +359,7 @@ function StudioShell() {
   };
 
   return (
-    <div className="st">
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="video/*,image/*"
-        style={{ display: 'none' }}
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) handleFileSelected(file);
-          e.target.value = '';
-        }}
-      />
+    <div className="st st--embedded">
       <TopBar
         name={name}
         onNameChange={(v) => {
@@ -400,8 +370,6 @@ function StudioShell() {
         running={running}
         onSave={handleSave}
         onRun={handleRun}
-        onUpload={handleUploadClick}
-        uploading={uploading}
         contentAssetId={contentAssetId}
       />
 
@@ -467,8 +435,6 @@ function TopBar({
   running,
   onSave,
   onRun,
-  onUpload,
-  uploading,
   contentAssetId,
 }: {
   name: string;
@@ -477,16 +443,11 @@ function TopBar({
   running: boolean;
   onSave: () => void;
   onRun: () => void;
-  onUpload: () => void;
-  uploading: boolean;
   contentAssetId: string | null;
 }) {
   return (
     <header className="st-top">
       <div className="st-top__left">
-        <Link to="/" className="st-back" aria-label="Back to CreatorFlow">
-          <ArrowLeft size={16} />
-        </Link>
         <input
           className="st-name"
           value={name}
@@ -496,11 +457,9 @@ function TopBar({
         <span className={`lp-tag ${saved ? 'lp-tag--pass' : 'lp-tag--warn'}`}>
           {saved ? 'Saved' : 'Unsaved changes'}
         </span>
+        {!contentAssetId && <span className="lp-tag lp-tag--neutral">Select an asset above to run</span>}
       </div>
       <div className="st-top__right">
-        <button className="st-btn st-btn--ghost" onClick={onUpload} disabled={uploading}>
-          <Upload size={14} /> {uploading ? 'Uploading…' : contentAssetId ? 'Asset ready' : 'Upload asset'}
-        </button>
         <button className="st-btn st-btn--ghost" onClick={onSave}>
           <Save size={14} /> Save
         </button>
