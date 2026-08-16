@@ -3,8 +3,6 @@
 Social media automation suite MVP — thumbnails, metadata/SEO, upload scheduling,
 analytics, comment moderation, and clip generation in one dashboard.
 
-Full technical spec: [social-media-automation-mvp-docs-supabase.md](social-media-automation-mvp-docs-supabase.md)
-
 ## Workflow
 
 ![CreatorFlow workflow diagram](docs/workflow-diagram.png)
