@@ -7,9 +7,15 @@
   font-family: var(--font-sans);
   overflow: hidden;
 }
-/* Embedded as a Library tab: fill the tab's flush panel instead of the viewport. */
+/* Embedded as a Library tab: fill the tab's flush panel instead of the viewport.
+   .lib-panel--flush is itself a flex row, so without flex:1 + min-width:0 this
+   sizes to its content instead of stretching — that's what left the canvas
+   squeezed into a sliver with blank space beside it. */
 .st--embedded {
   height: 100%;
+  width: 100%;
+  flex: 1;
+  min-width: 0;
 }
 
 /* ── top bar ──────────────────────────────────────────────────────── */

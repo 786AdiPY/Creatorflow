@@ -395,6 +395,7 @@ function StudioShell({ contentAssetId }: { contentAssetId: string | null }) {
             fitView
             fitViewOptions={{ padding: 0.25 }}
             minZoom={0.25}
+            proOptions={{ hideAttribution: true }}
           >
             <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} />
             <Controls showInteractive={false} />
