@@ -2,6 +2,8 @@
 
 CreatorFlow is an AI-powered workspace that turns a creator's raw content into publish-ready social media content, handles publishing, and brings the resulting performance data back into one dashboard.
 
+Per-page breakdown: [features.md](features.md)
+
 ## Workflow
 
 ![CreatorFlow workflow diagram](docs/workflow-diagram.png)
@@ -9,76 +11,64 @@ CreatorFlow is an AI-powered workspace that turns a creator's raw content into p
 Upload lands as a content asset, the orchestrator fans out to the five generation
 modules (metadata, thumbnail, clip, comment moderation, optimization) with a quality
 check/validation gate in front of each, then review/approve triggers publish across
-platforms and analytics rolls back into the dashboard. The Pipeline tab in the
-frontend renders this same flow per-asset, read from Supabase state — see
-[Pipeline tab](#current-state) below for how it's wired today vs. the full diagram.
+platforms and analytics rolls back into the dashboard. The Workflow tab in
+`/library` renders this same flow live — see [features.md](features.md) for
+how each piece is wired today vs. the full diagram.
 
 ## Structure
 
+Two apps.
+
 ```
-frontend/            React + Vite + TypeScript SPA (Tailwind, React Query, recharts) — the console
-marketing/           React + Vite + TypeScript SPA (own design system, @xyflow/react) — the public
-                      landing page + the Studio workflow builder. Separate app on purpose: see
-                      marketing/README.md.
+frontend/            React + Vite + TypeScript SPA — landing page + the
+                      dashboard (Workflow builder + six review modules)
 backend/
   supabase/
-    migrations/         Postgres schema (§4 of the spec)
-    functions/          Edge Functions, one per module — function -> service -> job
-      _shared/            db/cors/job/openrouter helpers shared across functions
-      platforms/          PlatformConnector interface + mock implementation
+    migrations/         Postgres schema
+  api/
+    index.py             FastAPI app — metadata/thumbnail/clip generation, publish
+  vercel.json
 ```
 
 ## Setup
 
-Requires a Supabase project and the [Supabase CLI](https://supabase.com/docs/guides/cli).
-CLI commands below run from `backend/` since that's where the `supabase/` dir lives.
-
 ```bash
 # Backend
 cd backend
-supabase link --project-ref <your-project-ref>
-supabase db push
-supabase functions deploy
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env   # SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / OPENROUTER_API_KEY
+uvicorn api.index:app --reload --port 8000
 
-# Set secrets used by Edge Functions
-supabase secrets set \
-  SUPABASE_URL=... SUPABASE_ANON_KEY=... SUPABASE_SERVICE_ROLE_KEY=... \
-  OPENROUTER_API_KEY=...
+# Schema — no CLI needed, paste these into your Supabase project's SQL Editor:
+#   backend/supabase/migrations/0001_init.sql
+#   backend/supabase/migrations/0002_storage.sql
 
-# Frontend (console)
+# Frontend
 cd ../frontend
-cp .env.example .env   # fill in VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY
+cp .env.example .env   # VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY / VITE_API_URL
 npm install
-npm run dev
-
-# Marketing site (landing + Studio) — separate app, runs on :5174
-cd ../marketing
-cp .env.example .env   # VITE_CONSOLE_URL, where the frontend/ above is hosted
-npm install
-npm run dev
+npm run dev             # http://localhost:5174
 ```
+
+Deploying to Vercel: two separate Vercel projects, one per directory (set
+each project's Root Directory to `frontend` or `backend`). Both ship a
+`vercel.json` — the frontend's rewrites every path to `index.html` (required
+for a client-routed SPA, otherwise deep links like `/library` 404), the
+backend's rewrites every path into the single FastAPI ASGI function.
 
 ### AI features (OpenRouter)
 
 All text-generation AI (currently: metadata/SEO title+description+tags) goes through
-`backend/supabase/functions/_shared/openrouter.ts` using an `OPENROUTER_API_KEY` secret.
-Defaults to `openai/gpt-4o-mini`; override with an `OPENROUTER_MODEL` secret if you want
-a different model. Thumbnail generation and clip analysis are not text tasks and are
-still stubbed (see below) — say the word if you want those wired to an OpenRouter
-image-capable model too.
-
-### Scheduled publishing
-
-`supabase/functions/publish-due` publishes any `scheduled_posts` whose time has come.
-Wire it to run on a schedule (e.g. `pg_cron` calling the function every minute, or a
-Supabase scheduled function) — it is not called from the request path.
+`backend/api/index.py` using an `OPENROUTER_API_KEY` env var. Defaults to
+`openai/gpt-4o-mini`; override with `OPENROUTER_MODEL`. Thumbnail generation
+and clip analysis are not text tasks and are still placeholders.
 
 ## Current state
 
-Scaffold pass: schema, RLS policies, all six modules' Edge Functions, and the
-frontend shell are in place with the job-polling pattern wired end-to-end.
-Metadata generation calls OpenRouter for real. Media processing (thumbnail render,
-ffmpeg clip analysis) is still stubbed — see `TODO` comments in
-`backend/supabase/functions/{thumbnails,clips}-generate/index.ts`. Platform
-publishing uses `MockConnector`; swap in a real `PlatformConnector` per platform
-(YouTube first, per spec §7) in `backend/supabase/functions/platforms/`.
+Schema + the full dashboard (Workflow builder, Thumbnails, Metadata,
+Clips, Schedule, Moderation, Analytics) are wired end-to-end against a real
+Supabase project. Metadata generation calls OpenRouter for real. Thumbnail
+render and clip analysis are still placeholders — see `TODO` comments in
+`backend/api/index.py`. Publishing is mocked (no real platform OAuth yet).
+No auth in this pass — single-workspace MVP, see `0001_init.sql`'s header.

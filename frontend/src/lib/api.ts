@@ -1,4 +1,4 @@
-// Thin client for the Python backend (backend-api/) — the operations that
+// Thin client for the Python backend (backend/) — the operations that
 // need a server-side secret (OpenRouter) or a mocked external call (publish).
 // Everything is synchronous: no job queue, the endpoint returns the finished row.
 import { API_URL } from './config';

@@ -1,8 +1,14 @@
 node_modules/
 dist/
+.vite/
 .env
 .env.local
 *.log
 .DS_Store
 backend/supabase/.branches/
 backend/supabase/.temp/
+backend/.venv/
+venv/
+__pycache__/
+*.pyc
+.vercel/

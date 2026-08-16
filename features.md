@@ -1,7 +1,7 @@
 # CreatorFlow — Features
 
-One app (`marketing/`), two routes. Everything reads/writes the same Supabase
-project; `backend-api/` (FastAPI) is the only thing that touches OpenRouter or
+One app (`frontend/`), two routes. Everything reads/writes the same Supabase
+project; `backend/` (FastAPI) is the only thing that touches OpenRouter or
 does anything on a schedule.
 
 ## `/` — Landing
@@ -24,7 +24,7 @@ global — every tab operates on whichever asset is currently selected.
   a real human-approval pause, publish, analytics/moderation reads).
 - **Thumbnails** — generate cover variants for the selected asset, pick one.
 - **Metadata** — generate title/description/tags per platform via
-  `backend-api`'s OpenRouter call, edit inline, save.
+  `backend/`'s OpenRouter call, edit inline, save.
 - **Clips** — find clip-worthy moments in a long-form asset.
 - **Schedule** — queue a post (platform + time), publish it immediately from
   the table once it's pending.
