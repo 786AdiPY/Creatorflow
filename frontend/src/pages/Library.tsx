@@ -372,34 +372,160 @@ function ClipsPanel({ contentAssetId }: { contentAssetId: string }) {
   );
 }
 
-// ── schedule ─────────────────────────────────────────────────────────────
-interface PostRow {
+// ── shared: posts-for-asset (title + platform joined in) ──────────────────
+interface Post {
   id: string;
   status: 'pending' | 'posted' | 'failed';
   scheduled_time: string;
-  connected_accounts: { platform: string } | null;
+  platform: string;
+  title: string;
+  error: string | null;
 }
 
+async function loadPosts(contentAssetId: string): Promise<Post[]> {
+  const { data } = await supabase
+    .from('scheduled_posts')
+    .select('id, status, scheduled_time, platform_payload, connected_accounts(platform), metadata_drafts(title)')
+    .eq('content_asset_id', contentAssetId)
+    .order('scheduled_time', { ascending: false });
+  return (data ?? []).map((p) => {
+    const row = p as unknown as {
+      id: string;
+      status: Post['status'];
+      scheduled_time: string;
+      platform_payload: { error?: string } | null;
+      connected_accounts: { platform: string } | null;
+      metadata_drafts: { title: string } | null;
+    };
+    return {
+      id: row.id,
+      status: row.status,
+      scheduled_time: row.scheduled_time,
+      platform: row.connected_accounts?.platform ?? 'youtube',
+      title: row.metadata_drafts?.title || 'Untitled post',
+      error: row.platform_payload?.error ?? null,
+    };
+  });
+}
+
+function useAssetTitle(contentAssetId: string) {
+  const [title, setTitle] = useState('this asset');
+  useEffect(() => {
+    supabase
+      .from('content_assets')
+      .select('storage_url')
+      .eq('id', contentAssetId)
+      .maybeSingle()
+      .then(({ data }) => setTitle(data?.storage_url.split('/').pop() ?? 'this asset'));
+  }, [contentAssetId]);
+  return title;
+}
+
+function PlatformBadge({ platform }: { platform: string }) {
+  const label: Record<string, string> = {
+    youtube: 'YouTube',
+    tiktok: 'TikTok',
+    instagram: 'Instagram',
+    x: 'X',
+    linkedin: 'LinkedIn',
+    threads: 'Threads',
+  };
+  return <span className={`lib-platform lib-platform--${platform}`}>{label[platform] ?? platform}</span>;
+}
+
+function StatusPill({ status }: { status: Post['status'] }) {
+  const label: Record<Post['status'], string> = { pending: 'PENDING', posted: 'PUBLISHED', failed: 'FAILED' };
+  return <span className={`lib-status lib-status--${status}`}>{label[status]}</span>;
+}
+
+/** Minimal SVG area chart — no charting library, matches the rest of this
+ * codebase's hand-rolled-primitives approach (see lib/motion.tsx). */
+function AreaChart({ points }: { points: { label: string; value: number }[] }) {
+  if (points.length === 0) return <div className="lib-empty">Not enough data yet.</div>;
+  const w = 600;
+  const h = 130;
+  const max = Math.max(...points.map((p) => p.value), 1);
+  const step = points.length > 1 ? w / (points.length - 1) : 0;
+  const coords = points.map((p, i) => [i * step, h - (p.value / max) * (h - 8) - 4] as const);
+  const line = coords.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+  const area = `${line} L${w},${h} L0,${h} Z`;
+  const ticks = points.length <= 4 ? points : [points[0], points[Math.floor(points.length / 3)], points[Math.floor((points.length * 2) / 3)], points[points.length - 1]];
+  return (
+    <>
+      <svg className="lib-area" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="lib-area-grad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--color-primary)" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="var(--color-primary)" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path d={area} fill="url(#lib-area-grad)" />
+        <path d={line} fill="none" stroke="var(--color-primary)" strokeWidth="2" />
+      </svg>
+      <div className="lib-area__ticks">
+        {ticks.map((t, i) => (
+          <span key={i}>{t.label}</span>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function Sparkline({ values, positive }: { values: number[]; positive: boolean }) {
+  if (values.length < 2) return <svg className="lib-sparkline" viewBox="0 0 100 32" />;
+  const w = 100;
+  const h = 32;
+  const max = Math.max(...values, 1);
+  const min = Math.min(...values, 0);
+  const range = max - min || 1;
+  const step = w / (values.length - 1);
+  const line = values
+    .map((v, i) => `${i === 0 ? 'M' : 'L'}${(i * step).toFixed(1)},${(h - ((v - min) / range) * (h - 4) - 2).toFixed(1)}`)
+    .join(' ');
+  return (
+    <svg className="lib-sparkline" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
+      <path d={line} fill="none" stroke={positive ? 'var(--color-good)' : 'var(--color-bad)'} strokeWidth="1.75" />
+    </svg>
+  );
+}
+
+function Delta({ pct }: { pct: number | null }) {
+  if (pct === null) return <span className="lib-delta lib-delta--flat">—</span>;
+  const up = pct >= 0;
+  return (
+    <span className={`lib-delta ${up ? 'lib-delta--up' : 'lib-delta--down'}`}>
+      {up ? '▲' : '▼'} {Math.abs(pct).toFixed(1)}%
+    </span>
+  );
+}
+
+// ── schedule ─────────────────────────────────────────────────────────────
 function SchedulePanel({ contentAssetId }: { contentAssetId: string }) {
-  const [posts, setPosts] = useState<PostRow[]>([]);
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [accounts, setAccounts] = useState<{ id: string; platform: string }[]>([]);
   const [platform, setPlatform] = useState('youtube');
   const [when, setWhen] = useState('');
   const [creating, setCreating] = useState(false);
-  const [publishingId, setPublishingId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const assetTitle = useAssetTitle(contentAssetId);
 
-  const load = () =>
-    supabase
-      .from('scheduled_posts')
-      .select('id, status, scheduled_time, connected_accounts(platform)')
-      .eq('content_asset_id', contentAssetId)
-      .order('scheduled_time', { ascending: false })
-      .then(({ data }) => setPosts((data as unknown as PostRow[]) ?? []));
+  const load = async () => {
+    setPosts(await loadPosts(contentAssetId));
+    const { data } = await supabase.from('connected_accounts').select('id, platform');
+    setAccounts(data ?? []);
+  };
 
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contentAssetId]);
+
+  const counts = {
+    pending: posts.filter((p) => p.status === 'pending').length,
+    posted: posts.filter((p) => p.status === 'posted').length,
+    failed: posts.filter((p) => p.status === 'failed').length,
+  };
 
   const create = async () => {
     setCreating(true);
@@ -455,24 +581,29 @@ function SchedulePanel({ contentAssetId }: { contentAssetId: string }) {
   };
 
   const publishNow = async (id: string) => {
-    setPublishingId(id);
+    setBusyId(id);
     try {
       await api.publish.now(id);
       await load();
     } finally {
-      setPublishingId(null);
+      setBusyId(null);
     }
   };
 
   return (
     <>
       <div className="lib-panel__head">
-        <h2>Schedule</h2>
+        <div className="lib-panel__titlewrap">
+          <h2>Schedule</h2>
+          <p className="lib-panel__sub">
+            Queue for <strong>{assetTitle}</strong> · {counts.pending} pending, {counts.posted} published, {counts.failed} failed
+          </p>
+        </div>
       </div>
 
       <div className="lib-card">
-        <div className="lib-row">
-          <div className="lib-field" style={{ flex: 1 }}>
+        <div className="lib-compose">
+          <div className="lib-field" style={{ marginBottom: 0 }}>
             <span>Platform</span>
             <select value={platform} onChange={(e) => setPlatform(e.target.value)}>
               <option value="youtube">YouTube</option>
@@ -480,14 +611,14 @@ function SchedulePanel({ contentAssetId }: { contentAssetId: string }) {
               <option value="tiktok">TikTok</option>
             </select>
           </div>
-          <div className="lib-field" style={{ flex: 1 }}>
-            <span>When</span>
+          <div className="lib-field" style={{ marginBottom: 0 }}>
+            <span>Publish at</span>
             <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} />
           </div>
+          <button className="lib-btn lib-btn--solid" onClick={create} disabled={creating}>
+            {creating ? 'Adding…' : 'Add to queue'}
+          </button>
         </div>
-        <button className="lib-btn lib-btn--solid" onClick={create} disabled={creating}>
-          {creating ? 'Scheduling…' : 'Schedule post'}
-        </button>
         {error && <p className="lib-empty">{error}</p>}
       </div>
 
@@ -496,8 +627,9 @@ function SchedulePanel({ contentAssetId }: { contentAssetId: string }) {
           <table className="lib-table">
             <thead>
               <tr>
+                <th>Post</th>
                 <th>Platform</th>
-                <th>When</th>
+                <th>Publish at</th>
                 <th>Status</th>
                 <th></th>
               </tr>
@@ -505,21 +637,21 @@ function SchedulePanel({ contentAssetId }: { contentAssetId: string }) {
             <tbody>
               {posts.map((p) => (
                 <tr key={p.id}>
-                  <td>{p.connected_accounts?.platform ?? '—'}</td>
-                  <td>{new Date(p.scheduled_time).toLocaleString()}</td>
-                  <td>
-                    <span className={`lp-tag ${p.status === 'posted' ? 'lp-tag--pass' : p.status === 'failed' ? 'lp-tag--block' : 'lp-tag--warn'}`}>
-                      {p.status}
-                    </span>
+                  <td style={{ whiteSpace: 'normal' }}>
+                    <div className="lib-post-title">{p.title}</div>
+                    {p.error && <div className="lib-post-note">{p.error}</div>}
                   </td>
                   <td>
-                    {p.status === 'pending' && (
-                      <button
-                        className="lib-btn lib-btn--sm"
-                        onClick={() => publishNow(p.id)}
-                        disabled={publishingId === p.id}
-                      >
-                        {publishingId === p.id ? 'Publishing…' : 'Publish now'}
+                    <PlatformBadge platform={p.platform} />
+                  </td>
+                  <td>{new Date(p.scheduled_time).toLocaleString()}</td>
+                  <td>
+                    <StatusPill status={p.status} />
+                  </td>
+                  <td>
+                    {(p.status === 'pending' || p.status === 'failed') && (
+                      <button className="lib-btn lib-btn--sm" onClick={() => publishNow(p.id)} disabled={busyId === p.id}>
+                        {busyId === p.id ? 'Publishing…' : p.status === 'failed' ? 'Retry' : 'Publish now'}
                       </button>
                     )}
                   </td>
@@ -529,30 +661,63 @@ function SchedulePanel({ contentAssetId }: { contentAssetId: string }) {
           </table>
         </div>
       )}
+
+      <div className="lib-card" style={{ marginTop: 'var(--space-4)' }}>
+        <h3 style={{ marginBottom: 'var(--space-3)' }}>Connected accounts</h3>
+        {accounts.length === 0 ? (
+          <p className="lib-empty">No accounts connected yet — one gets created the first time you schedule a post to a platform.</p>
+        ) : (
+          accounts.map((a) => (
+            <div key={a.id} className="lib-account-row">
+              <PlatformBadge platform={a.platform} />
+              <span className="lib-delta lib-delta--up">connected</span>
+            </div>
+          ))
+        )}
+      </div>
     </>
   );
 }
 
 // ── moderation ───────────────────────────────────────────────────────────
-interface CommentRow {
+interface Comment {
   id: string;
   author: string;
   text: string;
+  sentiment: string | null;
+  moderation_action: string | null;
+  fetched_at: string;
+  post_title: string;
 }
 
 function ModerationPanel({ contentAssetId }: { contentAssetId: string }) {
-  const [comments, setComments] = useState<CommentRow[]>([]);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [resolved, setResolved] = useState<Comment[]>([]);
+  const [filter, setFilter] = useState<'all' | 'flagged' | 'negative' | 'clean'>('all');
+  const assetTitle = useAssetTitle(contentAssetId);
 
   const load = async () => {
-    const { data: posts } = await supabase.from('scheduled_posts').select('id').eq('content_asset_id', contentAssetId);
-    const ids = (posts ?? []).map((p) => p.id);
-    if (ids.length === 0) return setComments([]);
-    const { data } = await supabase
+    const posts = await loadPosts(contentAssetId);
+    const ids = posts.map((p) => p.id);
+    if (ids.length === 0) return;
+    const byId = Object.fromEntries(posts.map((p) => [p.id, p.title]));
+
+    const { data: pending } = await supabase
       .from('comments')
-      .select('id, author, text')
+      .select('id, author, text, sentiment, moderation_action, fetched_at, scheduled_post_id')
       .in('scheduled_post_id', ids)
-      .is('moderation_action', null);
-    setComments(data ?? []);
+      .is('moderation_action', null)
+      .order('fetched_at', { ascending: false });
+    setComments((pending ?? []).map((c) => ({ ...c, post_title: byId[c.scheduled_post_id] ?? 'a post' })));
+
+    const { data: done } = await supabase
+      .from('comments')
+      .select('id, author, text, sentiment, moderation_action, fetched_at, scheduled_post_id')
+      .in('scheduled_post_id', ids)
+      .not('moderation_action', 'is', null)
+      .order('fetched_at', { ascending: false })
+      .limit(3);
+    setResolved((done ?? []).map((c) => ({ ...c, post_title: byId[c.scheduled_post_id] ?? 'a post' })));
   };
 
   useEffect(() => {
@@ -565,118 +730,369 @@ function ModerationPanel({ contentAssetId }: { contentAssetId: string }) {
     await load();
   };
 
+  const visible = comments.filter((c) => {
+    if (filter === 'all') return true;
+    if (filter === 'negative') return c.sentiment === 'negative';
+    if (filter === 'clean') return c.sentiment === 'positive' || c.sentiment === null;
+    return false; // 'flagged' has no source field yet — nothing matches, honestly
+  });
+
+  const mix = ['positive', 'neutral', 'negative'].map((k) => ({
+    key: k,
+    count: comments.filter((c) => (k === 'neutral' ? !c.sentiment : c.sentiment === k)).length,
+  }));
+  const mixTotal = comments.length || 1;
+
   return (
     <>
       <div className="lib-panel__head">
-        <h2>Moderation</h2>
-      </div>
-      {comments.length === 0 ? (
-        <p className="lib-empty">Inbox zero — comments arrive once a platform connector fetches them for this asset's posts.</p>
-      ) : (
-        <div className="lib-card">
-          {comments.map((c) => (
-            <div key={c.id} className="lib-comment">
-              <div>
-                <div className="lib-comment__author">{c.author}</div>
-                <div className="lib-comment__text">{c.text}</div>
-              </div>
-              <div className="lib-row">
-                <button className="lib-btn lib-btn--sm" onClick={() => act(c.id, 'approved')}>
-                  Approve
-                </button>
-                <button className="lib-btn lib-btn--sm" onClick={() => act(c.id, 'hidden')}>
-                  Hide
-                </button>
-              </div>
-            </div>
+        <div className="lib-panel__titlewrap">
+          <h2>Moderation</h2>
+          <p className="lib-panel__sub">
+            {comments.length} comment{comments.length === 1 ? '' : 's'} awaiting review across posts from <strong>{assetTitle}</strong>
+          </p>
+        </div>
+        <div className="lib-filters">
+          {(['all', 'flagged', 'negative', 'clean'] as const).map((f) => (
+            <button key={f} className={filter === f ? 'is-active' : ''} onClick={() => setFilter(f)}>
+              {f[0].toUpperCase() + f.slice(1)}
+            </button>
           ))}
         </div>
-      )}
+      </div>
+
+      <div className="lib-mod-layout">
+        <div>
+          {visible.length === 0 ? (
+            <p className="lib-empty">
+              {comments.length === 0
+                ? "Inbox zero — comments arrive once a platform connector fetches them for this asset's posts."
+                : 'No comments match this filter.'}
+            </p>
+          ) : (
+            visible.map((c) => (
+              <div key={c.id} className="lib-mod-card">
+                <div className="lib-mod-card__top">
+                  <span className="lib-avatar">{c.author.slice(0, 1).toUpperCase()}</span>
+                  <span className="lib-mod-card__name">{c.author}</span>
+                  {c.sentiment && <span className="lib-flag">{c.sentiment}</span>}
+                  <span className="lib-mod-card__time">{new Date(c.fetched_at).toLocaleString()}</span>
+                </div>
+                <p className="lib-mod-card__text">{c.text}</p>
+                <div className="lib-mod-card__foot">
+                  <span className="lib-mod-card__on">on {c.post_title}</span>
+                  <div className="lib-row">
+                    <button className="lib-btn lib-btn--sm" onClick={() => act(c.id, 'hidden')}>
+                      Hide
+                    </button>
+                    <button className="lib-btn lib-btn--sm lib-btn--solid" onClick={() => act(c.id, 'approved')}>
+                      Approve
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div>
+          <div className="lib-card">
+            <h3 style={{ marginBottom: 'var(--space-3)' }}>Queue mix</h3>
+            <div className="lib-mix">
+              {mix.map((m) => (
+                <div key={m.key}>
+                  <div className="lib-mix__row">
+                    <span style={{ textTransform: 'capitalize' }}>{m.key}</span>
+                    <span>{Math.round((m.count / mixTotal) * 100)}%</span>
+                  </div>
+                  <div className="lib-mix__bar">
+                    <div
+                      className="lib-mix__fill"
+                      style={{
+                        width: `${(m.count / mixTotal) * 100}%`,
+                        background: m.key === 'positive' ? 'var(--color-good)' : m.key === 'negative' ? 'var(--color-bad)' : 'var(--color-info)',
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="lib-panel__sub" style={{ marginTop: 'var(--space-2)' }}>
+              Based on the <span className="lp-mono">sentiment</span> field where a connector has set it.
+            </p>
+          </div>
+
+          <div className="lib-card" style={{ marginTop: 'var(--space-4)' }}>
+            <h3 style={{ marginBottom: 'var(--space-3)' }}>Recently resolved</h3>
+            {resolved.length === 0 ? (
+              <p className="lib-empty">Approve or hide a comment to see it here.</p>
+            ) : (
+              resolved.map((c) => (
+                <div key={c.id} className="lib-account-row">
+                  <span style={{ fontSize: 'var(--font-size-sm)' }}>{c.author}</span>
+                  <span className={`lib-delta ${c.moderation_action === 'approved' ? 'lib-delta--up' : 'lib-delta--down'}`}>
+                    {c.moderation_action}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
     </>
   );
 }
 
 // ── analytics ────────────────────────────────────────────────────────────
-interface SnapshotRow {
+interface Snapshot {
   id: string;
+  scheduled_post_id: string;
   platform: string;
   fetched_at: string;
-  metrics: { views?: number; likes?: number; comments?: number };
+  metrics: { views?: number; likes?: number; comments?: number; retention?: number };
+}
+
+const RANGES = { '7d': 7, '28d': 28, '90d': 90 } as const;
+type RangeKey = keyof typeof RANGES;
+
+function sum(snaps: Snapshot[], key: 'views' | 'likes' | 'comments') {
+  return snaps.reduce((acc, s) => acc + (s.metrics[key] ?? 0), 0);
+}
+function avg(snaps: Snapshot[], key: 'retention') {
+  const vals = snaps.map((s) => s.metrics[key]).filter((v): v is number => v != null);
+  return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+}
+function pctDelta(current: number, prior: number) {
+  if (prior === 0) return current === 0 ? 0 : null;
+  return ((current - prior) / prior) * 100;
 }
 
 function AnalyticsPanel({ contentAssetId }: { contentAssetId: string }) {
-  const [snapshots, setSnapshots] = useState<SnapshotRow[]>([]);
+  const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [range, setRange] = useState<RangeKey>('28d');
+  const assetTitle = useAssetTitle(contentAssetId);
 
   useEffect(() => {
     (async () => {
-      const { data: posts } = await supabase.from('scheduled_posts').select('id').eq('content_asset_id', contentAssetId);
-      const ids = (posts ?? []).map((p) => p.id);
+      const loadedPosts = await loadPosts(contentAssetId);
+      setPosts(loadedPosts);
+      const ids = loadedPosts.map((p) => p.id);
       if (ids.length === 0) return setSnapshots([]);
       const { data } = await supabase
         .from('analytics_snapshots')
         .select('*')
         .in('scheduled_post_id', ids)
-        .order('fetched_at', { ascending: false });
+        .order('fetched_at', { ascending: true });
       setSnapshots(data ?? []);
     })();
   }, [contentAssetId]);
 
-  const totals = snapshots.reduce(
-    (acc, s) => ({
-      views: acc.views + (s.metrics.views ?? 0),
-      likes: acc.likes + (s.metrics.likes ?? 0),
-      comments: acc.comments + (s.metrics.comments ?? 0),
-    }),
-    { views: 0, likes: 0, comments: 0 },
-  );
+  const days = RANGES[range];
+  const now = Date.now();
+  const currentStart = now - days * 86_400_000;
+  const priorStart = now - 2 * days * 86_400_000;
+
+  const current = snapshots.filter((s) => new Date(s.fetched_at).getTime() >= currentStart);
+  const prior = snapshots.filter((s) => {
+    const t = new Date(s.fetched_at).getTime();
+    return t >= priorStart && t < currentStart;
+  });
+
+  const publishedPosts = posts.filter((p) => p.status === 'posted');
+
+  if (snapshots.length === 0) {
+    return (
+      <>
+        <div className="lib-panel__head">
+          <h2>Analytics</h2>
+        </div>
+        <p className="lib-empty">No analytics yet — publish a post to start collecting data.</p>
+      </>
+    );
+  }
+
+  const views = { cur: sum(current, 'views'), prior: sum(prior, 'views') };
+  const likes = { cur: sum(current, 'likes'), prior: sum(prior, 'likes') };
+  const comments = { cur: sum(current, 'comments'), prior: sum(prior, 'comments') };
+  const watch = { cur: avg(current, 'retention'), prior: avg(prior, 'retention') };
+
+  // daily totals for the area chart
+  const byDay = new Map<string, number>();
+  for (const s of current) {
+    const d = new Date(s.fetched_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    byDay.set(d, (byDay.get(d) ?? 0) + (s.metrics.views ?? 0));
+  }
+  const chartPoints = [...byDay.entries()].map(([label, value]) => ({ label, value }));
+
+  // sparkline series per metric = daily current-window totals (reuse chart grouping)
+  const sparkValues = (key: 'views' | 'likes' | 'comments') => {
+    const m = new Map<string, number>();
+    for (const s of current) {
+      const d = new Date(s.fetched_at).toLocaleDateString();
+      m.set(d, (m.get(d) ?? 0) + (s.metrics[key] ?? 0));
+    }
+    return [...m.values()];
+  };
+
+  // best performer = post with highest summed views in the current window
+  const viewsByPost = new Map<string, number>();
+  for (const s of current) viewsByPost.set(s.scheduled_post_id, (viewsByPost.get(s.scheduled_post_id) ?? 0) + (s.metrics.views ?? 0));
+  const bestId = [...viewsByPost.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+  const bestPost = publishedPosts.find((p) => p.id === bestId);
+  const bestSnaps = current.filter((s) => s.scheduled_post_id === bestId);
 
   return (
     <>
       <div className="lib-panel__head">
-        <h2>Analytics</h2>
+        <div className="lib-panel__titlewrap">
+          <h2>Analytics</h2>
+          <p className="lib-panel__sub">
+            {publishedPosts.length} published post{publishedPosts.length === 1 ? '' : 's'} from <strong>{assetTitle}</strong>
+          </p>
+        </div>
+        <div className="lib-range">
+          {(Object.keys(RANGES) as RangeKey[]).map((r) => (
+            <button key={r} className={range === r ? 'is-active' : ''} onClick={() => setRange(r)}>
+              {r}
+            </button>
+          ))}
+        </div>
       </div>
-      {snapshots.length === 0 ? (
-        <p className="lib-empty">No analytics yet — publish a post to start collecting data.</p>
-      ) : (
-        <>
-          <div className="lib-stats">
-            <div className="lib-stat">
-              <div className="lib-stat__label">Views</div>
-              <div className="lib-stat__value">{totals.views.toLocaleString()}</div>
+
+      <div className="lib-chart-card">
+        <div className="lib-card">
+          <div className="lib-chart-card__head">
+            <div>
+              <div className="lib-stat__label">Total views · {range}</div>
+              <div className="lib-chart-big">{views.cur.toLocaleString()}</div>
+              <Delta pct={pctDelta(views.cur, views.prior)} />
             </div>
-            <div className="lib-stat">
-              <div className="lib-stat__label">Likes</div>
-              <div className="lib-stat__value">{totals.likes.toLocaleString()}</div>
-            </div>
-            <div className="lib-stat">
-              <div className="lib-stat__label">Comments</div>
-              <div className="lib-stat__value">{totals.comments.toLocaleString()}</div>
+            <div className="lib-chart-card__mini">
+              <div>
+                <div className="lib-stat__label">Avg. watch</div>
+                <strong>{watch.cur != null ? `${Math.round(watch.cur * 100)}%` : '—'}</strong>
+                <div>
+                  <Delta pct={watch.cur != null && watch.prior != null ? pctDelta(watch.cur, watch.prior) : null} />
+                </div>
+              </div>
+              <div>
+                <div className="lib-stat__label">Engagements</div>
+                <strong>{(likes.cur + comments.cur).toLocaleString()}</strong>
+                <div>
+                  <Delta pct={pctDelta(likes.cur + comments.cur, likes.prior + comments.prior)} />
+                </div>
+              </div>
             </div>
           </div>
-          <div className="lib-table-wrap">
-            <table className="lib-table">
-              <thead>
-                <tr>
-                  <th>Platform</th>
-                  <th>Fetched</th>
-                  <th>Views</th>
-                  <th>Likes</th>
+          <AreaChart points={chartPoints} />
+        </div>
+
+        <div className="lib-card lib-best">
+          <div className="lib-stat__label">Best performer</div>
+          {bestPost ? (
+            <>
+              <div className="lib-best__title">{bestPost.title}</div>
+              <div className="lib-row">
+                <PlatformBadge platform={bestPost.platform} />
+                <span className="lib-panel__sub">published {new Date(bestPost.scheduled_time).toLocaleDateString()}</span>
+              </div>
+              <div className="lib-best__grid">
+                <div>
+                  Views
+                  <strong>{sum(bestSnaps, 'views').toLocaleString()}</strong>
+                </div>
+                <div>
+                  Likes
+                  <strong>{sum(bestSnaps, 'likes').toLocaleString()}</strong>
+                </div>
+                <div>
+                  Comments
+                  <strong>{sum(bestSnaps, 'comments').toLocaleString()}</strong>
+                </div>
+                <div>
+                  Avg. watch
+                  <strong>{avg(bestSnaps, 'retention') != null ? `${Math.round(avg(bestSnaps, 'retention')! * 100)}%` : '—'}</strong>
+                </div>
+              </div>
+              <p className="lib-best__note">Highest view count among this asset's posts in the last {range}.</p>
+            </>
+          ) : (
+            <p className="lib-empty">No published posts in this window yet.</p>
+          )}
+        </div>
+      </div>
+
+      <div className="lib-sparktiles">
+        {(
+          [
+            { label: 'Views', key: 'views' as const, cur: views.cur, prior: views.prior },
+            { label: 'Likes', key: 'likes' as const, cur: likes.cur, prior: likes.prior },
+            { label: 'Comments', key: 'comments' as const, cur: comments.cur, prior: comments.prior },
+          ]
+        ).map((tile) => {
+          const delta = pctDelta(tile.cur, tile.prior);
+          return (
+            <div key={tile.key} className="lib-sparktile">
+              <div className="lib-sparktile__head">
+                <span className="lib-stat__label">{tile.label}</span>
+                <Delta pct={delta} />
+              </div>
+              <div className="lib-stat__value">{tile.cur.toLocaleString()}</div>
+              <Sparkline values={sparkValues(tile.key)} positive={delta === null || delta >= 0} />
+            </div>
+          );
+        })}
+        <div className="lib-sparktile">
+          <div className="lib-sparktile__head">
+            <span className="lib-stat__label">Avg. watch</span>
+            <Delta pct={watch.cur != null && watch.prior != null ? pctDelta(watch.cur, watch.prior) : null} />
+          </div>
+          <div className="lib-stat__value">{watch.cur != null ? `${Math.round(watch.cur * 100)}%` : '—'}</div>
+        </div>
+      </div>
+
+      <div className="lib-table-wrap">
+        <table className="lib-table">
+          <thead>
+            <tr>
+              <th>Post</th>
+              <th>Platform</th>
+              <th>Views</th>
+              <th>Avg. watch</th>
+              <th>Likes</th>
+              <th>Comments</th>
+              <th>Trend</th>
+            </tr>
+          </thead>
+          <tbody>
+            {publishedPosts.map((p) => {
+              const postCur = current.filter((s) => s.scheduled_post_id === p.id);
+              const postPrior = prior.filter((s) => s.scheduled_post_id === p.id);
+              const v = sum(postCur, 'views');
+              if (v === 0 && postCur.length === 0) return null;
+              return (
+                <tr key={p.id}>
+                  <td style={{ whiteSpace: 'normal' }}>
+                    <div className="lib-post-title">{p.title}</div>
+                    <div className="lib-panel__sub">published {new Date(p.scheduled_time).toLocaleDateString()}</div>
+                  </td>
+                  <td>
+                    <PlatformBadge platform={p.platform} />
+                  </td>
+                  <td>{v.toLocaleString()}</td>
+                  <td>{avg(postCur, 'retention') != null ? `${Math.round(avg(postCur, 'retention')! * 100)}%` : '—'}</td>
+                  <td>{sum(postCur, 'likes').toLocaleString()}</td>
+                  <td>{sum(postCur, 'comments').toLocaleString()}</td>
+                  <td>
+                    <Delta pct={pctDelta(v, sum(postPrior, 'views'))} />
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {snapshots.map((s) => (
-                  <tr key={s.id}>
-                    <td>{s.platform}</td>
-                    <td>{new Date(s.fetched_at).toLocaleString()}</td>
-                    <td>{s.metrics.views ?? '—'}</td>
-                    <td>{s.metrics.likes ?? '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </>
   );
 }
