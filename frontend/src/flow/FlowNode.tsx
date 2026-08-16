@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
-import { CircleDot, TriangleAlert } from 'lucide-react';
+import { Check, CircleDot, TriangleAlert } from 'lucide-react';
 
 import type { FlowNode, NodeKind } from './types';
 import { KIND_LABEL } from './types';
@@ -37,7 +37,7 @@ function FlowNodeImpl({ data, selected }: NodeProps<FlowNode>) {
       <div className="fn__foot">
         {data.status === 'ready' ? (
           <span className="fn__status is-ready">
-            <CircleDot size={11} /> Configured
+            <Check size={11} /> Configured
           </span>
         ) : (
           <span className="fn__status is-pending">
