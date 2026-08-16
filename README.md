@@ -8,7 +8,10 @@ Full technical spec: [social-media-automation-mvp-docs-supabase.md](social-media
 ## Structure
 
 ```
-frontend/            React + Vite + TypeScript SPA (Tailwind, React Query, recharts)
+frontend/            React + Vite + TypeScript SPA (Tailwind, React Query, recharts) — the console
+marketing/           React + Vite + TypeScript SPA (own design system, @xyflow/react) — the public
+                      landing page + the Studio workflow builder. Separate app on purpose: see
+                      marketing/README.md.
 backend/
   supabase/
     migrations/         Postgres schema (§4 of the spec)
@@ -34,9 +37,15 @@ supabase secrets set \
   SUPABASE_URL=... SUPABASE_ANON_KEY=... SUPABASE_SERVICE_ROLE_KEY=... \
   OPENROUTER_API_KEY=...
 
-# Frontend
+# Frontend (console)
 cd ../frontend
 cp .env.example .env   # fill in VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY
+npm install
+npm run dev
+
+# Marketing site (landing + Studio) — separate app, runs on :5174
+cd ../marketing
+cp .env.example .env   # VITE_CONSOLE_URL, where the frontend/ above is hosted
 npm install
 npm run dev
 ```

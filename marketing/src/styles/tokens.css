@@ -1,0 +1,167 @@
+/* ===================================================================
+   Design tokens — the whole look is driven from here.
+   Warm-ink base + a single "flame" accent (publish / live), on purpose:
+   this is a creator tool, not an infra console. Light is the default;
+   the dark block overrides via prefers-color-scheme.
+   =================================================================== */
+:root {
+  /* ── brand ─────────────────────────────────────────────────────── */
+  --color-brand: #171310;
+  --color-brand-hover: #2a231c;
+  --color-brand-active: #3a3128;
+  --color-brand-contrast: #fbf9f6;
+
+  /* ── surfaces & text ───────────────────────────────────────────── */
+  --color-bg: #f7f5f1;
+  --color-surface: #ffffff;
+  --color-surface-2: #f1eee7;
+  --color-surface-3: #e8e2d6;
+  --color-text: #171310;
+  --color-text-2: #423a30;
+  --color-muted: #756a5b;
+  --color-faint: #a89c89;
+  --color-border: #e6ded0;
+  --color-border-strong: #d2c5b0;
+
+  /* ── accent (CTAs, active states, focus) ─────────────────────────
+     "flame" — the color of a publish/live indicator. */
+  --color-primary: #ff4d2e;
+  --color-primary-hover: #e8431f;
+  --color-primary-active: #cf3a1a;
+  --color-primary-contrast: #fffaf7;
+  --color-primary-tint: #ffece6;
+
+  /* ── semantic ──────────────────────────────────────────────────── */
+  --color-good: #157a4a;
+  --color-good-strong: #18965a;
+  --color-bad: #c8341f;
+  --color-warn: #a35a09;
+  --color-info: #1d6fa5;
+  --color-violet: #6d28d9;
+
+  /* ── radius ────────────────────────────────────────────────────── */
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+  --radius-full: 9999px;
+
+  /* ── spacing scale ─────────────────────────────────────────────── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  /* ── typography ────────────────────────────────────────────────── */
+  --font-sans: 'Lexend', system-ui, -apple-system, 'Segoe UI', Roboto, Arial,
+    sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono',
+    monospace;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.85rem;
+  --font-size-base: 0.95rem;
+  --font-size-lg: 1.15rem;
+  --font-size-xl: 1.45rem;
+  --font-size-2xl: 1.8rem;
+  --line-height: 1.55;
+
+  /* ── elevation (warm-tinted, not neutral-grey) ────────────────────── */
+  --shadow-xs: 0 1px 2px rgba(23, 19, 16, 0.06);
+  --shadow-sm: 0 1px 3px rgba(23, 19, 16, 0.09), 0 1px 2px rgba(23, 19, 16, 0.06);
+  --shadow-md: 0 4px 6px -1px rgba(23, 19, 16, 0.09),
+    0 2px 4px -2px rgba(23, 19, 16, 0.09);
+  --shadow-lg: 0 10px 15px -3px rgba(23, 19, 16, 0.1),
+    0 4px 6px -4px rgba(23, 19, 16, 0.09);
+  --shadow-card: 0 1px 3px rgba(23, 19, 16, 0.06),
+    0 10px 20px -5px rgba(23, 19, 16, 0.08);
+  --shadow-card-hover: 0 1px 3px rgba(23, 19, 16, 0.06),
+    0 20px 25px -5px rgba(23, 19, 16, 0.12), 0 10px 10px -5px rgba(23, 19, 16, 0.05);
+  --shadow-glow: 0 0 0 1px rgba(255, 77, 46, 0.16), 0 8px 24px -6px rgba(255, 77, 46, 0.35);
+
+  /* ── motion ────────────────────────────────────────────────────── */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-fast: 150ms var(--ease);
+  --transition: 250ms var(--ease);
+
+  /* ── stacking ──────────────────────────────────────────────────── */
+  --z-sticky: 1020;
+  --z-popover: 1070;
+  --z-modal: 1090;
+
+  --header-h: 64px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-brand: #f3ede2;
+    --color-brand-hover: #ffffff;
+    --color-brand-active: #d8cdba;
+    --color-brand-contrast: #14110d;
+
+    --color-bg: #100e0a;
+    --color-surface: #17130f;
+    --color-surface-2: #1e1912;
+    --color-surface-3: #262017;
+    --color-text: #f3ede2;
+    --color-text-2: #d6cab6;
+    --color-muted: #a3957f;
+    --color-faint: #6d6252;
+    --color-border: #2a2318;
+    --color-border-strong: #3c3221;
+
+    --color-primary: #ff6b45;
+    --color-primary-hover: #ff8563;
+    --color-primary-active: #ffa587;
+    --color-primary-contrast: #14110d;
+    --color-primary-tint: #2c1811;
+
+    --color-good: #4fd18b;
+    --color-good-strong: #2fb873;
+    --color-bad: #ff7a63;
+    --color-warn: #f0b74c;
+    --color-info: #6fc1ef;
+    --color-violet: #b79bf6;
+
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -2px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.55),
+      0 4px 6px -4px rgba(0, 0, 0, 0.5);
+    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4), 0 10px 20px -5px rgba(0, 0, 0, 0.5);
+    --shadow-card-hover: 0 1px 3px rgba(0, 0, 0, 0.4),
+      0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 10px 10px -5px rgba(0, 0, 0, 0.4);
+    --shadow-glow: 0 0 0 1px rgba(255, 107, 69, 0.25), 0 8px 28px -6px rgba(255, 107, 69, 0.45);
+  }
+}
+
+:root[data-theme='dark'] {
+  --color-brand: #f3ede2;
+  --color-brand-hover: #ffffff;
+  --color-brand-active: #d8cdba;
+  --color-brand-contrast: #14110d;
+  --color-bg: #100e0a;
+  --color-surface: #17130f;
+  --color-surface-2: #1e1912;
+  --color-surface-3: #262017;
+  --color-text: #f3ede2;
+  --color-text-2: #d6cab6;
+  --color-muted: #a3957f;
+  --color-faint: #6d6252;
+  --color-border: #2a2318;
+  --color-border-strong: #3c3221;
+  --color-primary: #ff6b45;
+  --color-primary-hover: #ff8563;
+  --color-primary-active: #ffa587;
+  --color-primary-contrast: #14110d;
+  --color-primary-tint: #2c1811;
+  --color-good: #4fd18b;
+  --color-good-strong: #2fb873;
+  --color-bad: #ff7a63;
+  --color-warn: #f0b74c;
+  --color-info: #6fc1ef;
+  --color-violet: #b79bf6;
+}

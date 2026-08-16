@@ -1,0 +1,179 @@
+/* ===================================================================
+   Shared node-canvas styling — used by both the landing page's embedded
+   preview and the full Studio builder. Retheme @xyflow/react's own chrome
+   (edges, handles, background, controls, minimap) to match our tokens,
+   then style the custom node card on top.
+   =================================================================== */
+
+.flow-shell {
+  --flow-trigger: var(--color-primary);
+  --flow-generate: var(--color-violet);
+  --flow-action: var(--color-info);
+  --flow-gate: var(--color-warn);
+  --flow-output: var(--color-good);
+
+  width: 100%;
+  height: 100%;
+  background: var(--color-surface-2);
+}
+
+.flow-shell .react-flow__background-pattern {
+  color: var(--color-border);
+}
+
+.flow-shell .react-flow__edge-path {
+  stroke: var(--color-border-strong);
+  stroke-width: 1.6;
+}
+
+.flow-shell .react-flow__edge.animated .react-flow__edge-path {
+  stroke: var(--color-faint);
+  stroke-dasharray: 5 4;
+}
+
+.flow-shell .react-flow__edge.selected .react-flow__edge-path,
+.flow-shell .react-flow__connection-path {
+  stroke: var(--color-primary);
+}
+
+.flow-shell .react-flow__handle {
+  width: 9px;
+  height: 9px;
+  background: var(--color-surface);
+  border: 2px solid var(--color-border-strong);
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+.flow-shell .react-flow__handle:hover,
+.flow-shell .react-flow__handle-connecting {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+}
+
+.flow-shell .react-flow__controls {
+  box-shadow: var(--shadow-card);
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+}
+.flow-shell .react-flow__controls-button {
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  fill: var(--color-text-2);
+  stroke: var(--color-text-2);
+}
+.flow-shell .react-flow__controls-button:hover {
+  background: var(--color-surface-3);
+}
+
+.flow-shell .react-flow__minimap {
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.flow-shell .react-flow__attribution {
+  background: transparent;
+  font-size: 9px;
+}
+.flow-shell .react-flow__attribution a {
+  color: var(--color-faint);
+}
+
+/* ── the module card itself ────────────────────────────────────────── */
+.fn {
+  width: 216px;
+  padding: 12px 13px 10px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--fn-accent, var(--color-border-strong));
+  box-shadow: var(--shadow-card);
+  cursor: grab;
+  transition: box-shadow var(--transition-fast), transform var(--transition-fast);
+}
+.fn:active {
+  cursor: grabbing;
+}
+.fn.is-selected {
+  box-shadow: var(--shadow-glow);
+}
+.fn.is-trigger { --fn-accent: var(--flow-trigger); }
+.fn.is-generate { --fn-accent: var(--flow-generate); }
+.fn.is-action { --fn-accent: var(--flow-action); }
+.fn.is-gate { --fn-accent: var(--flow-gate); }
+.fn.is-output { --fn-accent: var(--flow-output); }
+
+.fn__head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 8px;
+}
+.fn__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--fn-accent) 16%, transparent);
+  color: var(--fn-accent);
+  flex-shrink: 0;
+}
+.fn__kind {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fn-accent);
+}
+
+.fn__title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-text);
+  line-height: 1.3;
+}
+.fn__sub {
+  margin-top: 3px;
+  font-size: 11.5px;
+  color: var(--color-muted);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.fn__foot {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.fn__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.fn__status.is-ready { color: var(--color-good); }
+.fn__status.is-pending { color: var(--color-warn); }
+.fn__meta {
+  font-size: 10px;
+  color: var(--color-faint);
+}
+
+/* ── run simulation pulse (Studio only) ──────────────────────────────── */
+.react-flow__node.fn-pulse .fn {
+  box-shadow: var(--shadow-glow);
+  border-color: var(--color-primary);
+  transform: scale(1.035);
+}
+

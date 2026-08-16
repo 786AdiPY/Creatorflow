@@ -1,0 +1,147 @@
+import {
+  BarChart3,
+  CalendarClock,
+  Image,
+  MessageSquare,
+  Scissors,
+  Send,
+  ShieldCheck,
+  Tags,
+  Upload,
+} from 'lucide-react';
+
+import type { FlowEdge, FlowNode } from './types';
+
+export const initialNodes: FlowNode[] = [
+  {
+    id: 'ingest',
+    type: 'module',
+    position: { x: 0, y: 190 },
+    data: {
+      label: 'New Upload',
+      kind: 'trigger',
+      subtitle: 'Raw footage lands from the studio or a storage bucket.',
+      icon: Upload,
+      status: 'ready',
+      meta: 'content_asset',
+    },
+  },
+  {
+    id: 'clip',
+    type: 'module',
+    position: { x: 300, y: 0 },
+    data: {
+      label: 'Clip Finder',
+      kind: 'generate',
+      subtitle: 'Scores the source for clip-worthy moments.',
+      icon: Scissors,
+      status: 'ready',
+      meta: '≥1 clip',
+    },
+  },
+  {
+    id: 'thumbnail',
+    type: 'module',
+    position: { x: 300, y: 190 },
+    data: {
+      label: 'Thumbnail AI',
+      kind: 'generate',
+      subtitle: 'Generates on-brand cover variants.',
+      icon: Image,
+      status: 'ready',
+      meta: '≥2 variants',
+    },
+  },
+  {
+    id: 'metadata',
+    type: 'module',
+    position: { x: 300, y: 380 },
+    data: {
+      label: 'Metadata AI',
+      kind: 'generate',
+      subtitle: 'Titles, descriptions and tags, per platform.',
+      icon: Tags,
+      status: 'needs-setup',
+      meta: 'char-limit aware',
+    },
+  },
+  {
+    id: 'schedule',
+    type: 'module',
+    position: { x: 620, y: 190 },
+    data: {
+      label: 'Schedule',
+      kind: 'action',
+      subtitle: 'Slots the release onto the calendar.',
+      icon: CalendarClock,
+      status: 'ready',
+      meta: 'calendar view',
+    },
+  },
+  {
+    id: 'approval',
+    type: 'module',
+    position: { x: 900, y: 190 },
+    data: {
+      label: 'Approval',
+      kind: 'gate',
+      subtitle: 'Holds for a human sign-off before it goes out.',
+      icon: ShieldCheck,
+      status: 'ready',
+      meta: 'human gate',
+    },
+  },
+  {
+    id: 'publish',
+    type: 'module',
+    position: { x: 1180, y: 190 },
+    data: {
+      label: 'Publish',
+      kind: 'action',
+      subtitle: 'Posts to every connected account.',
+      icon: Send,
+      status: 'needs-setup',
+      platforms: ['YouTube', 'Instagram'],
+      meta: '2 accounts',
+    },
+  },
+  {
+    id: 'analytics',
+    type: 'module',
+    position: { x: 1480, y: 60 },
+    data: {
+      label: 'Analytics',
+      kind: 'output',
+      subtitle: 'Views, retention and comments, pulled back in.',
+      icon: BarChart3,
+      status: 'ready',
+      meta: 'daily refresh',
+    },
+  },
+  {
+    id: 'moderation',
+    type: 'module',
+    position: { x: 1480, y: 320 },
+    data: {
+      label: 'Moderation',
+      kind: 'output',
+      subtitle: 'Flags and files comments for review.',
+      icon: MessageSquare,
+      status: 'ready',
+      meta: 'sentiment tagged',
+    },
+  },
+];
+
+export const initialEdges: FlowEdge[] = [
+  { id: 'e-ingest-clip', source: 'ingest', target: 'clip', animated: true },
+  { id: 'e-ingest-thumb', source: 'ingest', target: 'thumbnail', animated: true },
+  { id: 'e-ingest-meta', source: 'ingest', target: 'metadata', animated: true },
+  { id: 'e-clip-schedule', source: 'clip', target: 'schedule', animated: true },
+  { id: 'e-thumb-schedule', source: 'thumbnail', target: 'schedule', animated: true },
+  { id: 'e-meta-schedule', source: 'metadata', target: 'schedule', animated: true },
+  { id: 'e-schedule-approval', source: 'schedule', target: 'approval', animated: true },
+  { id: 'e-approval-publish', source: 'approval', target: 'publish', animated: true },
+  { id: 'e-publish-analytics', source: 'publish', target: 'analytics', animated: true },
+  { id: 'e-publish-moderation', source: 'publish', target: 'moderation', animated: true },
+];
