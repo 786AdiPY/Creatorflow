@@ -22,7 +22,8 @@ export function AssetPicker({ value, onChange }: AssetPickerProps) {
 
   return (
     <select
-      className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-900"
+      className="select"
+      style={{ width: 'auto', minWidth: 220 }}
       value={value ?? ''}
       onChange={(e) => onChange(e.target.value)}
       disabled={isLoading}

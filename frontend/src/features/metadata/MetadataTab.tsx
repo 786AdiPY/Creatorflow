@@ -18,47 +18,39 @@ export function MetadataTab({ contentAssetId }: { contentAssetId: string | null 
   })
 
   if (!contentAssetId) {
-    return <p className="text-sm text-gray-500">Select a content asset to generate metadata.</p>
+    return <p className="muted">Select a content asset to generate metadata.</p>
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <select
-          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-700"
-          value={platform}
-          onChange={(e) => setPlatform(e.target.value as Platform)}
-        >
+    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+      <div className="row">
+        <select className="select" style={{ width: 'auto' }} value={platform} onChange={(e) => setPlatform(e.target.value as Platform)}>
           <option value="youtube">YouTube</option>
           <option value="instagram">Instagram</option>
           <option value="tiktok">TikTok</option>
         </select>
-        <button
-          className="rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          onClick={() => generate.mutate()}
-          disabled={generate.isPending}
-        >
+        <button className="btn btn--primary" onClick={() => generate.mutate()} disabled={generate.isPending}>
           Generate metadata
         </button>
         {job && <JobStatusBadge status={job.status} />}
       </div>
 
-      <div className="space-y-2">
+      <div className="stack">
         <input
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700"
+          className="input"
           placeholder="Title"
           value={draft.title}
           onChange={(e) => setDraft({ ...draft, title: e.target.value })}
         />
         <textarea
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700"
+          className="textarea"
           placeholder="Description"
           rows={4}
           value={draft.description}
           onChange={(e) => setDraft({ ...draft, description: e.target.value })}
         />
         <input
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700"
+          className="input"
           placeholder="Tags (comma separated)"
           value={draft.tags}
           onChange={(e) => setDraft({ ...draft, tags: e.target.value })}

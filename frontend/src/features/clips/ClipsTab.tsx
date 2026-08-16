@@ -36,29 +36,25 @@ export function ClipsTab({ contentAssetId }: { contentAssetId: string | null }) 
   }
 
   if (!contentAssetId) {
-    return <p className="text-sm text-gray-500">Select a long-form content asset to find clip-worthy moments.</p>
+    return <p className="muted">Select a long-form content asset to find clip-worthy moments.</p>
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <button
-          className="rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          onClick={() => generate.mutate()}
-          disabled={generate.isPending}
-        >
+    <div className="card stack">
+      <div className="row">
+        <button className="btn btn--primary" onClick={() => generate.mutate()} disabled={generate.isPending}>
           Find clips
         </button>
         {job && <JobStatusBadge status={job.status} />}
       </div>
 
-      <div className="space-y-2">
+      <div className="stack">
         {clips?.map((clip) => (
-          <div key={clip.id} className="flex items-center justify-between rounded-md border border-gray-200 px-4 py-2 dark:border-gray-800">
-            <span className="text-sm">
+          <div key={clip.id} className="row" style={{ justifyContent: 'space-between', padding: 'var(--space-2) 0', borderBottom: '1px solid var(--color-border)' }}>
+            <span className="mono">
               {(clip.start_ms / 1000).toFixed(1)}s – {(clip.end_ms / 1000).toFixed(1)}s
             </span>
-            {clip.score != null && <span className="text-xs text-gray-500">score {clip.score.toFixed(2)}</span>}
+            {clip.score != null && <span className="muted mono">score {clip.score.toFixed(2)}</span>}
           </div>
         ))}
       </div>

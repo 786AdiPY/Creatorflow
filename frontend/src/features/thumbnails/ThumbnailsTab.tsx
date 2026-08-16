@@ -36,14 +36,14 @@ export function ThumbnailsTab({ contentAssetId }: { contentAssetId: string | nul
   }
 
   if (!contentAssetId) {
-    return <p className="text-sm text-gray-500">Select a content asset to generate thumbnails.</p>
+    return <p className="muted">Select a content asset to generate thumbnails.</p>
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
+    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+      <div className="row">
         <button
-          className="rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="btn btn--primary"
           onClick={() => generate.mutate()}
           disabled={generate.isPending || (!!job && job.status !== 'done' && job.status !== 'failed')}
         >
@@ -57,9 +57,10 @@ export function ThumbnailsTab({ contentAssetId }: { contentAssetId: string | nul
           <button
             key={variant.id}
             onClick={() => setSelected(variant.id)}
-            className={`overflow-hidden rounded-lg border-2 ${
-              selected === variant.id ? 'border-purple-600' : 'border-transparent'
-            }`}
+            className="overflow-hidden rounded-lg"
+            style={{
+              border: `2px solid ${selected === variant.id ? 'var(--color-primary)' : 'transparent'}`,
+            }}
           >
             <img src={variant.storage_url} alt={variant.variant_label} className="aspect-video w-full object-cover" />
           </button>
