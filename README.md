@@ -5,6 +5,17 @@ analytics, comment moderation, and clip generation in one dashboard.
 
 Full technical spec: [social-media-automation-mvp-docs-supabase.md](social-media-automation-mvp-docs-supabase.md)
 
+## Workflow
+
+![CreatorFlow workflow diagram](docs/workflow-diagram.png)
+
+Upload lands as a content asset, the orchestrator fans out to the five generation
+modules (metadata, thumbnail, clip, comment moderation, optimization) with a quality
+check/validation gate in front of each, then review/approve triggers publish across
+platforms and analytics rolls back into the dashboard. The Pipeline tab in the
+frontend renders this same flow per-asset, read from Supabase state — see
+[Pipeline tab](#current-state) below for how it's wired today vs. the full diagram.
+
 ## Structure
 
 ```
