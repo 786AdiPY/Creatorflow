@@ -25,34 +25,32 @@ export function ModerationTab() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['comments'] }),
   })
 
+  if (!comments?.length) {
+    return (
+      <div className="card">
+        <p className="muted">Inbox zero. No comments pending review.</p>
+      </div>
+    )
+  }
+
   return (
-    <div className="divide-y divide-gray-200 rounded-lg border border-gray-200 dark:divide-gray-800 dark:border-gray-800">
-      {comments?.length ? (
-        comments.map((comment) => (
-          <div key={comment.id} className="flex items-center justify-between gap-4 px-4 py-3">
-            <div className="min-w-0 text-left">
-              <p className="truncate text-sm font-medium">{comment.author}</p>
-              <p className="truncate text-sm text-gray-500">{comment.text}</p>
-            </div>
-            <div className="flex shrink-0 gap-2">
-              <button
-                className="rounded-md bg-green-600 px-3 py-1 text-xs font-medium text-white"
-                onClick={() => act.mutate({ id: comment.id, action: 'approve' })}
-              >
-                Approve
-              </button>
-              <button
-                className="rounded-md bg-red-600 px-3 py-1 text-xs font-medium text-white"
-                onClick={() => act.mutate({ id: comment.id, action: 'hide' })}
-              >
-                Hide
-              </button>
-            </div>
+    <div className="stack">
+      {comments.map((comment) => (
+        <div key={comment.id} className="card row" style={{ justifyContent: 'space-between' }}>
+          <div style={{ minWidth: 0, textAlign: 'left' }}>
+            <p style={{ fontWeight: 600 }}>{comment.author}</p>
+            <p className="muted">{comment.text}</p>
           </div>
-        ))
-      ) : (
-        <p className="px-4 py-6 text-center text-sm text-gray-500">Inbox zero. No comments pending review.</p>
-      )}
+          <div className="row" style={{ flex: 'none' }}>
+            <button className="btn btn--sm" onClick={() => act.mutate({ id: comment.id, action: 'approve' })}>
+              Approve
+            </button>
+            <button className="btn btn--sm btn--danger" onClick={() => act.mutate({ id: comment.id, action: 'hide' })}>
+              Hide
+            </button>
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
