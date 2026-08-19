@@ -10,12 +10,17 @@
     "lint": "tsc -b --noEmit"
   },
   "dependencies": {
+    "@react-three/drei": "^9.122.0",
+    "@react-three/fiber": "^8.18.0",
+    "@react-three/postprocessing": "^2.19.1",
     "@supabase/supabase-js": "^2.112.3",
+    "@types/three": "^0.169.0",
     "@xyflow/react": "^12.3.6",
     "lucide-react": "^0.462.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^7.18.2"
+    "react-router-dom": "^7.18.2",
+    "three": "^0.169.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

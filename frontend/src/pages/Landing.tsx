@@ -8,7 +8,7 @@
 //
 // Chapter 03 deliberately doesn't fake a metrics dashboard the product
 // hasn't earned yet — it embeds the real @xyflow/react canvas instead.
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import {
@@ -28,6 +28,10 @@ import PipelinePreview from '../components/PipelinePreview';
 import { KIND_LABEL } from '../flow/types';
 import type { NodeKind } from '../flow/types';
 import './Landing.css';
+
+// The hero's WebGL scene pulls in three.js — code-split so it streams in
+// after first paint instead of blocking the landing page's initial load.
+const PipelineScene = lazy(() => import('../three/PipelineScene'));
 
 const CHAPTERS = [
   { id: 'problem', label: 'The problem' },
@@ -91,6 +95,9 @@ function Nav() {
         <a href="#pipeline">Pipeline</a>
         <a href="#studio">Builder</a>
         <a href="#platform">Platform</a>
+        <Link to="/orbit" className="lp-nav__orbit">
+          ✦ View in 3D
+        </Link>
       </nav>
       <Link to="/library" className="lp-nav__cta">
         Open the Studio
@@ -151,6 +158,10 @@ function Hero() {
 
   return (
     <section className="lp-hero">
+      <span className="lp-hero__ambient" aria-hidden="true">
+        <i className="lp-hero__blob lp-hero__blob--a" />
+        <i className="lp-hero__blob lp-hero__blob--b" />
+      </span>
       <div className="lp-hero__inner">
         <p className="lp-eyebrow">
           <span className="lp-eyebrow__dot" aria-hidden="true" />
@@ -225,10 +236,12 @@ function HeroFigure() {
               <i />
               <i />
             </span>
-            <span className="lp-mono">weekly_vlog_042 · pipeline</span>
+            <span className="lp-mono">weekly_vlog_042 · pipeline · drag to explore at /orbit</span>
           </figcaption>
-          <div className="lp-fig__flow">
-            <PipelinePreview />
+          <div className="lp-fig__flow lp-fig__flow--3d">
+            <Suspense fallback={<div className="lp-fig__flow-fallback" aria-hidden="true" />}>
+              <PipelineScene compact />
+            </Suspense>
           </div>
         </figure>
       </div>
@@ -435,15 +448,7 @@ function Pipeline() {
             style={reduced ? undefined : { transform: `translate3d(${-p * overflow}px,0,0)` }}
           >
             {STAGES.map((s, i) => (
-              <article className={`lp-stage ${i === activeIndex ? 'is-active' : ''}`} key={s.k}>
-                <header>
-                  <span className="lp-stage__n lp-mono">{String(i + 1).padStart(2, '0')}</span>
-                  <span className="lp-stage__k lp-mono">{s.k}</span>
-                </header>
-                <h3>{s.t}</h3>
-                <p>{s.d}</p>
-                <footer className="lp-mono">{s.m}</footer>
-              </article>
+              <StageCard s={s} i={i} active={i === activeIndex} key={s.k} />
             ))}
           </div>
         </div>
@@ -455,6 +460,22 @@ function Pipeline() {
         </div>
       </div>
     </section>
+  );
+}
+
+function StageCard({ s, i, active }: { s: (typeof STAGES)[number]; i: number; active: boolean }) {
+  const tilt = useTilt3D<HTMLElement>(9);
+  return (
+    <article className={`lp-stage ${active ? 'is-active' : ''}`} ref={tilt}>
+      <span className="lp-stage__glare" aria-hidden="true" />
+      <header>
+        <span className="lp-stage__n lp-mono">{String(i + 1).padStart(2, '0')}</span>
+        <span className="lp-stage__k lp-mono">{s.k}</span>
+      </header>
+      <h3>{s.t}</h3>
+      <p>{s.d}</p>
+      <footer className="lp-mono">{s.m}</footer>
+    </article>
   );
 }
 
@@ -638,16 +659,24 @@ function Platform() {
 
       <div className="lp-wrap lp-stack">
         {CAPS.map((c, i) => (
-          <article className="lp-stack__card" key={c.k} style={{ ['--i' as string]: i }}>
-            <span className="lp-stack__n lp-mono">{String(i + 1).padStart(2, '0')}</span>
-            <div>
-              <h3>{c.k}</h3>
-              <p>{c.d}</p>
-            </div>
-          </article>
+          <StackCard c={c} i={i} key={c.k} />
         ))}
       </div>
     </section>
+  );
+}
+
+function StackCard({ c, i }: { c: (typeof CAPS)[number]; i: number }) {
+  const tilt = useTilt3D<HTMLElement>(4);
+  return (
+    <article className="lp-stack__card" ref={tilt} style={{ ['--i' as string]: i }}>
+      <span className="lp-stack__glare" aria-hidden="true" />
+      <span className="lp-stack__n lp-mono">{String(i + 1).padStart(2, '0')}</span>
+      <div>
+        <h3>{c.k}</h3>
+        <p>{c.d}</p>
+      </div>
+    </article>
   );
 }
 

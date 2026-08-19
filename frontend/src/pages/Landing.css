@@ -106,6 +106,10 @@
 .lp-nav__links a:hover {
   color: var(--color-text);
 }
+.lp-nav__orbit {
+  color: var(--color-primary) !important;
+  font-weight: 600;
+}
 @media (max-width: 860px) {
   .lp-nav__links {
     display: none;
@@ -182,12 +186,60 @@
 
 /* ── hero ─────────────────────────────────────────────────────────── */
 .lp-hero {
+  position: relative;
+  z-index: 0;
   min-height: 100vh;
   display: flex;
   align-items: center;
   gap: clamp(24px, 4vw, 56px);
   padding: calc(var(--header-h) + 44px) clamp(20px, 4vw, 56px) 60px;
   flex-wrap: wrap;
+  overflow: hidden;
+}
+.lp-hero__ambient {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+}
+.lp-hero__blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.28;
+  animation: lp-blob-drift 12s ease-in-out infinite;
+}
+.lp-hero__blob--a {
+  width: 480px;
+  height: 480px;
+  top: -160px;
+  right: 8%;
+  background: radial-gradient(circle, var(--color-primary) 0%, transparent 70%);
+}
+.lp-hero__blob--b {
+  width: 420px;
+  height: 420px;
+  bottom: -180px;
+  left: 4%;
+  background: radial-gradient(circle, var(--color-violet) 0%, transparent 70%);
+  animation-delay: 3s;
+}
+@keyframes lp-blob-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.22;
+  }
+  50% {
+    transform: translate3d(-24px, 26px, 0) scale(1.12);
+    opacity: 0.36;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-hero__blob {
+    animation: none;
+  }
 }
 .lp-hero__inner {
   flex: 1 1 460px;
@@ -257,9 +309,16 @@
 .lp-btn--solid {
   background: var(--color-primary);
   color: var(--color-primary-contrast);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.25) inset, 0 6px 16px -6px color-mix(in srgb, var(--color-primary) 60%, transparent);
 }
 .lp-btn--solid:hover {
   background: var(--color-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.25) inset, 0 10px 22px -8px color-mix(in srgb, var(--color-primary) 65%, transparent);
+}
+.lp-btn--solid:active {
+  transform: translateY(1px) scale(0.98);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.15) inset, 0 3px 8px -4px color-mix(in srgb, var(--color-primary) 60%, transparent);
 }
 .lp-btn--ghost {
   color: var(--color-text);
@@ -267,6 +326,10 @@
 }
 .lp-btn--ghost:hover {
   background: var(--color-surface-2);
+  transform: translateY(-1px);
+}
+.lp-btn--ghost:active {
+  transform: translateY(1px) scale(0.98);
 }
 .lp-btn--lg {
   padding: 15px 28px;
@@ -370,6 +433,39 @@
 @media (max-width: 480px) {
   .lp-fig__flow {
     height: 220px;
+  }
+}
+.lp-fig__flow--3d canvas {
+  display: block;
+}
+.lp-fig__flow-fallback {
+  height: 100%;
+  width: 100%;
+  background: radial-gradient(circle at 30% 30%, #241b14 0%, #07050a 70%);
+  position: relative;
+  overflow: hidden;
+}
+.lp-fig__flow-fallback::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, rgba(255, 107, 69, 0.35) 0%, transparent 60%);
+  width: 140px;
+  height: 140px;
+  margin: auto;
+  border-radius: 50%;
+  filter: blur(18px);
+  animation: lp-pulse 1.8s ease-in-out infinite;
+}
+@keyframes lp-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.1);
   }
 }
 
@@ -562,18 +658,34 @@
 }
 
 .lp-stage {
+  position: relative;
   flex: 0 0 clamp(250px, 25vw, 320px);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: 24px;
   opacity: 0.5;
-  transition: opacity var(--transition), border-color var(--transition), box-shadow var(--transition);
+  overflow: hidden;
+  transform-style: preserve-3d;
+  transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  box-shadow: 0 calc(var(--sy, 20) * 1px) calc(30px + var(--lift, 0) * 10px) calc(var(--sx, 0) * 1px)
+    rgba(23, 19, 16, calc(0.08 + var(--lift, 0) * 0.1));
+  transition: opacity var(--transition), border-color var(--transition);
 }
 .lp-stage.is-active {
   opacity: 1;
   border-color: var(--color-primary);
-  box-shadow: var(--shadow-glow);
+}
+.lp-stage__glare {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at var(--gx, 50%) var(--gy, 50%),
+    color-mix(in srgb, var(--color-primary) 16%, transparent),
+    transparent 60%
+  );
+  opacity: var(--lift, 0);
 }
 .lp-stage header {
   display: flex;
@@ -831,6 +943,20 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
+  overflow: hidden;
+  transform-style: preserve-3d;
+  transform: perspective(1200px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+}
+.lp-stack__glare {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at var(--gx, 50%) var(--gy, 50%),
+    color-mix(in srgb, var(--color-primary) 10%, transparent),
+    transparent 60%
+  );
+  opacity: var(--lift, 0);
 }
 .lp-stack__n {
   font-size: 12px;
